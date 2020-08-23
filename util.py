@@ -6,9 +6,32 @@
 @time: 2020/8/19 21:25
 @desc: xdCovid19Upper server's util.
 """
-from bson import json_util
+import base64
 import json
+from io import BytesIO
+from random import sample
+
+from bson import json_util
+from captcha.image import ImageCaptcha
 
 
 def bson_to_obj(o):
     return json.loads(json_util.dumps(o))
+
+
+def gene_captcha_str():
+    base_char = 'qwertyuiopasdfghjklzxcvbnm' \
+                'QWERTYUIOPASDFGHJKLZXCVBNM' \
+                '12345678901234567890' \
+                '12345678901234567890'
+    return ''.join(sample(base_char, 4))
+
+
+def gene_captcha_b64img(captcha_str):
+    img = ImageCaptcha().generate_image(captcha_str)
+    img_buffer = BytesIO()
+    img.save(img_buffer, 'png')
+    res = img_buffer.getvalue()
+    img_buffer.close()
+
+    return f'data:image/png;base64,{base64.b64encode(res).decode("utf-8")}'

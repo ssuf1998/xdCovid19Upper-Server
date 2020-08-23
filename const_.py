@@ -17,10 +17,10 @@ class DEFAULT_CODE:
 class CHECK:
     NORMAL = 0
     DB_NO_RESPONSE = 1
-    UNKNOWN = 999
+    ADMIN_ERR = 999
 
 
-class CHECK_INVITATION:
+class SIGNUP_CHECK:
     NORMAL = 0
     OUTDATED = 1
     INVALID = 2

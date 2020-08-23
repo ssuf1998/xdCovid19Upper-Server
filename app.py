@@ -15,6 +15,7 @@ from platform import system as platform_sys
 from time import localtime, time
 
 import pymongo
+from bson.objectid import ObjectId
 from flask import Flask, jsonify
 from flask import request as flask_req
 from flask_apscheduler import APScheduler
@@ -36,20 +37,39 @@ db_client = pymongo.MongoClient(serverSelectionTimeoutMS=5000)
 data_db = db_client['xcu']
 user_col = data_db['user']
 invitation_col = data_db['invitation']
+sys_col = data_db['sys']
+
+captcha_dict = {}
 
 
 @app.route('/check', methods=['GET'])
 def check():
     try:
         db_client.server_info()
+
+        sys_params = sys_col.find_one({
+            '_id': ObjectId('5f4259d3e091c53e98b17847')
+        }, {
+            'id': False,
+            'last_suc_timestamp': False
+        })
+        if sys_params.get('has_err_info'):
+            return jsonify({
+                'code': const_.CHECK.ADMIN_ERR,
+                'msg': sys_params.get('err_info').get('msg'),
+                'raw': sys_params.get('err_info').get('raw_err'),
+            })
+
         return jsonify({
             'code': const_.CHECK.NORMAL,
             'msg': '',
+            'raw': '',
         })
     except ServerSelectionTimeoutError:
         return jsonify({
             'code': const_.CHECK.DB_NO_RESPONSE,
-            'msg': 'Database is not responding.',
+            'msg': '',
+            'raw': 'Database is not responding.',
         })
 
 
@@ -90,7 +110,7 @@ def signup():
     if not client_code or (not sid or not pw):
         return jsonify({
             'code': const_.DEFAULT_CODE.PARAMS_ERROR,
-            'valid': const_.CHECK_INVITATION.UNKNOWN
+            'valid': const_.SIGNUP_CHECK.UNKNOWN
         })
 
     if user_col.count_documents({
@@ -98,7 +118,7 @@ def signup():
     }) != 0:
         return jsonify({
             'code': const_.DEFAULT_CODE.FAILED,
-            'valid': const_.CHECK_INVITATION.UNKNOWN
+            'valid': const_.SIGNUP_CHECK.UNKNOWN
         })
 
     server_code = invitation_col.find_one({
@@ -110,12 +130,12 @@ def signup():
     if not server_code:
         return jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
-            'valid': const_.CHECK_INVITATION.INVALID
+            'valid': const_.SIGNUP_CHECK.INVALID
         })
     elif server_code['times'] == 0:
         return jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
-            'valid': const_.CHECK_INVITATION.OUTDATED
+            'valid': const_.SIGNUP_CHECK.OUTDATED
         })
     else:
         times = server_code['times'] - 1 \
@@ -159,7 +179,7 @@ def signup():
 
         return jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
-            'valid': const_.CHECK_INVITATION.NORMAL
+            'valid': const_.SIGNUP_CHECK.NORMAL
         })
 
 
@@ -200,6 +220,12 @@ def get_user_info():
             'code': const_.DEFAULT_CODE.PARAMS_ERROR,
         })
 
+    last_suc_timestamp = sys_col.find_one({
+        '_id': ObjectId('5f4259d3e091c53e98b17847')
+    }, {
+        'last_suc_timestamp': True
+    }).get('last_suc_timestamp')
+
     specific_user = user_col.find_one({
         'sid': sid,
         'pw': pw
@@ -213,12 +239,14 @@ def get_user_info():
     if specific_user:
         return jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
-            'user_info': util.bson_to_obj(specific_user)
+            'user_info': util.bson_to_obj(specific_user),
+            'last_ts': last_suc_timestamp
         })
     else:
         return jsonify({
             'code': const_.DEFAULT_CODE.FAILED,
-            'user_info': None
+            'user_info': None,
+            'last_ts': last_suc_timestamp
         })
 
 
@@ -286,36 +314,93 @@ def update_user_info():
         })
 
 
+@app.route('/captcha', methods=['GET'])
+def captcha():
+    captcha_id = flask_req.args.get('cid')
+
+    if not captcha_id:
+        return jsonify({
+            'code': const_.DEFAULT_CODE.PARAMS_ERROR,
+            'img': ''
+        })
+
+    captcha_str = util.gene_captcha_str()
+    captcha_b64img = util.gene_captcha_b64img(captcha_str)
+
+    captcha_dict[captcha_id] = captcha_str.lower()
+
+    return jsonify({
+        'code': const_.DEFAULT_CODE.SUCCESS,
+        'img': captcha_b64img
+    })
+
+
+@app.route('/checkcaptcha', methods=['GET'])
+def check_captcha():
+    client_captcha = flask_req.args.get('v')
+    captcha_id = flask_req.args.get('cid')
+
+    if not client_captcha or not captcha_id:
+        return jsonify({
+            'code': const_.DEFAULT_CODE.PARAMS_ERROR
+        })
+
+    if client_captcha.lower() != captcha_dict.get(captcha_id):
+        return jsonify({
+            'code': const_.DEFAULT_CODE.FAILED
+        })
+
+    captcha_dict.pop(captcha_id)
+    return jsonify({
+        'code': const_.DEFAULT_CODE.SUCCESS
+    })
+
+
 def run_auto_fill_in():
-    if localtime(time()).tm_hour in range(8, 24):
-        try:
-            filler = XCUAutoFiller(headless=True)
-            filler.users = util.bson_to_obj(user_col.find({}, {'_id': False}))
-            filler.run()
-            for user in filler.users:
-                user_col.update_one({
-                    'sid': user['sid']
+    sys_params = sys_col.find_one({
+        '_id': ObjectId('5f4259d3e091c53e98b17847')
+    }, {
+        'has_err_info': True,
+        '_id': False
+    })
+    if not sys_params.get('has_err_info'):
+        if localtime(time()).tm_hour in range(8, 24):
+            try:
+                filler = XCUAutoFiller(headless=True)
+                filler.users = util.bson_to_obj(user_col.find({}, {'_id': False}))
+                filler.run()
+                for user in filler.users:
+                    user_col.update_one({
+                        'sid': user['sid']
+                    }, {
+                        '$set': {
+                            'is_pw_wrong': user['is_pw_wrong'],
+                            'is_up': user['is_up'],
+                        }
+                    })
+
+                with open('./log/auto_filler.log', mode='a') as fp:
+                    fp.write(filler.log)
+                sys_col.update_one({
+                    '_id': ObjectId('5f4259d3e091c53e98b17847')
                 }, {
                     '$set': {
-                        'is_pw_wrong': user['is_pw_wrong'],
-                        'is_up': user['is_up'],
+                        'last_suc_timestamp': filler.this_running_timestamp
                     }
                 })
-            with open('./log/auto_filler.log', mode='a') as fp:
-                fp.write(filler.log)
-        except Exception as auto_fill_e:
-            app.logger.error(auto_fill_e)
+            except Exception as auto_fill_e:
+                app.logger.error(auto_fill_e)
 
-    elif localtime(time()).tm_hour == 0:
-        user_col.update_many({}, {
-            '$set': {
-                'is_up': {
-                    'morning': const_.UP_STATUS.NOT_UP,
-                    'afternoon': const_.UP_STATUS.NOT_UP,
-                    'evening': const_.UP_STATUS.NOT_UP,
+        elif localtime(time()).tm_hour == 0:
+            user_col.update_many({}, {
+                '$set': {
+                    'is_up': {
+                        'morning': const_.UP_STATUS.NOT_UP,
+                        'afternoon': const_.UP_STATUS.NOT_UP,
+                        'evening': const_.UP_STATUS.NOT_UP,
+                    }
                 }
-            }
-        })
+            })
 
 
 class FlaskConfig():
