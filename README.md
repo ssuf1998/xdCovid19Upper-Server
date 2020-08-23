@@ -27,6 +27,4 @@
 
 微信号：ssuf1998
 
-<p style="font-size:small;color:grey;">
 要不给仓库点个星？
-</p>
