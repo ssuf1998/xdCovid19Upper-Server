@@ -118,7 +118,9 @@ def signup():
             'valid': const_.CHECK_INVITATION.OUTDATED
         })
     else:
-        times = server_code['times'] - 1
+        times = server_code['times'] - 1 \
+            if server_code['times'] > 0 \
+            else server_code['times']
 
         coords = form_data.get('coords') if form_data.get('coords') else {
             'latitude': FAKE_LAT,
@@ -381,7 +383,7 @@ if not exists('./log'):
     mkdir('./log')
 
 if __name__ == '__main__':
-    init_scheduler_once()
+    # init_scheduler_once()
     app.run(host='0.0.0.0', port=5015)
 else:
     gunicorn_logger = logging.getLogger('gunicorn.error')

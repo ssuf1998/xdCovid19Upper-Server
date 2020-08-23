@@ -144,6 +144,7 @@ scheduler.lock
 xcu_gunicorn_conf
 log/
 test_filler.py
+invitation_code_generator.py
 
 # Editor directories and files
 .idea
