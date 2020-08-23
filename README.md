@@ -9,7 +9,7 @@
 如果你在找前端仓库，可以点击[这里](https://github.com/ssuf1998/xdCovid19Upper-Client)。
 
 #### 是不是用了什么黑科技？
-没有……就只是用了Selenium接管Chromium去填的，没做逆向，直接用网页上的api直接填，考虑到用Selenium会更容易，且不用我去猜表单里一堆拼音首字符究竟是啥意思。
+没有……就只是用了Selenium接管Chromium去填的，没做逆向用网页上的api直接填那种，考虑到用Selenium会更容易，且不用我去猜表单里一堆拼音首字母缩写究竟是啥意思。
 
 #### 都用了啥技术？
 - [Python](https://www.python.org/)
