@@ -18,36 +18,40 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from bson.objectid import ObjectId
 from pymongo.errors import ServerSelectionTimeoutError
 
+db_client = pymongo.MongoClient(serverSelectionTimeoutMS=5000)
+data_db = db_client['xcu']
+sys_col = data_db['sys']
+
 
 def do_keep():
-    db_client = pymongo.MongoClient(serverSelectionTimeoutMS=5000)
-    data_db = db_client['xcu']
-    sys_col = data_db['sys']
+    sys_params = sys_col.find_one({
+        '_id': ObjectId('5f4259d3e091c53e98b17847')
+    }, {
+        'has_err_info': True,
+        'last_suc_timestamp': True,
+        '_id': False
+    })
 
-    try:
-        db_client.server_info()
-        last_suc_timestamp = sys_col.find_one({
-            '_id': ObjectId('5f4259d3e091c53e98b17847')
-        }, {
-            'last_suc_timestamp': True,
-        }).get('last_suc_timestamp')
-        last_suc_timestamp = int(last_suc_timestamp)
+    if not sys_params.get('has_err_info'):
+        if localtime(time()).tm_hour in range(8, 24):
+            try:
+                last_suc_timestamp = int(sys_params.get('last_suc_timestamp'))
 
-        if int(time()) - last_suc_timestamp > 60 * 40:
-            xcus_status_raw = popen('systemctl status xcu_server').read()
-            xcus_status = re.search('(?<=Active: )(.*)(?= since)', xcus_status_raw)
-            if xcus_status:
-                xcus_status = xcus_status.group(0)
-                with open('./log/xcu_server_keeper.log', mode='a') as fp:
-                    if xcus_status.find('active') != -1:
-                        popen('systemctl restart xcu_server')
-                        fp.write(f'[{strftime("%Y-%m-%d %H:%M:%S", localtime())}] restarted.\n')
-                    else:
-                        popen('systemctl start xcu_server')
-                        fp.write(f'[{strftime("%Y-%m-%d %H:%M:%S", localtime())}] started.\n')
+                if int(time()) - last_suc_timestamp > 60 * 40:
+                    xcus_status_raw = popen('systemctl status xcu_server').read()
+                    xcus_status = re.search('(?<=Active: )(.*)(?= since)', xcus_status_raw)
+                    if xcus_status:
+                        xcus_status = xcus_status.group(0)
+                        with open('./log/xcu_server_keeper.log', mode='a') as fp:
+                            if xcus_status.find('active') != -1:
+                                popen('systemctl restart xcu_server')
+                                fp.write(f'[{strftime("%Y-%m-%d %H:%M:%S", localtime())}] restarted.\n')
+                            else:
+                                popen('systemctl start xcu_server')
+                                fp.write(f'[{strftime("%Y-%m-%d %H:%M:%S", localtime())}] started.\n')
 
-    except ServerSelectionTimeoutError:
-        pass
+            except ServerSelectionTimeoutError:
+                pass
 
 
 if not exists('./log'):
@@ -57,4 +61,3 @@ if platform_sys() == 'Linux':
     scheduler = BlockingScheduler()
     scheduler.add_job(do_keep, 'cron', minute='45')
     scheduler.start()
-
