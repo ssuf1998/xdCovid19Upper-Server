@@ -11,7 +11,6 @@ import logging
 from atexit import register as atexit_reg
 from os import mkdir
 from os.path import exists
-from platform import system as platform_sys
 from time import localtime, time
 
 import pymongo
@@ -103,15 +102,17 @@ def is_new_user():
 def signup():
     form_data = flask_req.form if len(flask_req.form) != 0 else json.loads(flask_req.data)
 
-    client_code = form_data.get('code')
-    sid = form_data.get('sid')
-    pw = form_data.get('pw')
-
-    if not client_code or (not sid or not pw):
+    if not util.check_params(
+            form_data,
+            ('code', 'sid', 'pw')):
         return jsonify({
             'code': const_.DEFAULT_CODE.PARAMS_ERROR,
             'valid': const_.SIGNUP_CHECK.UNKNOWN
         })
+
+    client_code = form_data.get('code')
+    sid = form_data.get('sid')
+    pw = form_data.get('pw')
 
     if user_col.count_documents({
         'sid': sid
@@ -188,13 +189,15 @@ def signup():
 def login():
     form_data = flask_req.form if len(flask_req.form) != 0 else json.loads(flask_req.data)
 
-    sid = form_data.get('sid')
-    pw = form_data.get('pw')
-
-    if not sid or not pw:
+    if not util.check_params(
+            form_data,
+            ('sid', 'pw')):
         return jsonify({
             'code': const_.DEFAULT_CODE.PARAMS_ERROR,
         })
+
+    sid = form_data.get('sid')
+    pw = form_data.get('pw')
 
     if user_col.find_one({
         'sid': sid,
@@ -213,13 +216,15 @@ def login():
 def get_user_info():
     form_data = flask_req.form if len(flask_req.form) != 0 else json.loads(flask_req.data)
 
-    sid = form_data.get('sid')
-    pw = form_data.get('pw')
-
-    if not sid or not pw:
+    if not util.check_params(
+            form_data,
+            ('sid', 'pw')):
         return jsonify({
             'code': const_.DEFAULT_CODE.PARAMS_ERROR,
         })
+
+    sid = form_data.get('sid')
+    pw = form_data.get('pw')
 
     last_suc_timestamp = sys_col.find_one({
         '_id': ObjectId('5f4259d3e091c53e98b17847')
@@ -255,13 +260,15 @@ def get_user_info():
 def del_user():
     form_data = flask_req.form if len(flask_req.form) != 0 else json.loads(flask_req.data)
 
-    sid = form_data.get('sid')
-    pw = form_data.get('pw')
-
-    if not sid or not pw:
+    if not util.check_params(
+            form_data,
+            ('sid', 'pw')):
         return jsonify({
             'code': const_.DEFAULT_CODE.PARAMS_ERROR,
         })
+
+    sid = form_data.get('sid')
+    pw = form_data.get('pw')
 
     count = user_col.delete_one({
         'sid': sid,
@@ -282,14 +289,16 @@ def del_user():
 def update_user_info():
     form_data = flask_req.form if len(flask_req.form) != 0 else json.loads(flask_req.data)
 
-    sid = form_data.get('sid')
-    pw = form_data.get('pw')
-    new_user_info = form_data.get('new_user_info')
-
-    if not sid or not pw:
+    if not util.check_params(
+            form_data,
+            ('sid', 'pw', 'new_user_info')):
         return jsonify({
             'code': const_.DEFAULT_CODE.PARAMS_ERROR,
         })
+
+    sid = form_data.get('sid')
+    pw = form_data.get('pw')
+    new_user_info = form_data.get('new_user_info')
 
     if (new_user_info.get('pw') is None and
             new_user_info.get('coords') is None and
@@ -338,13 +347,15 @@ def captcha():
 
 @app.route('/checkcaptcha', methods=['GET'])
 def check_captcha():
+    if not util.check_params(
+            flask_req.args,
+            ('v', 'cid')):
+        return jsonify({
+            'code': const_.DEFAULT_CODE.PARAMS_ERROR,
+        })
+
     client_captcha = flask_req.args.get('v')
     captcha_id = flask_req.args.get('cid')
-
-    if not client_captcha or not captcha_id:
-        return jsonify({
-            'code': const_.DEFAULT_CODE.PARAMS_ERROR
-        })
 
     if client_captcha.lower() != captcha_dict.get(captcha_id):
         return jsonify({
@@ -357,7 +368,7 @@ def check_captcha():
     })
 
 
-def run_auto_fill_in():
+def timing_auto_fill_in():
     sys_params = sys_col.find_one({
         '_id': ObjectId('5f4259d3e091c53e98b17847')
     }, {
@@ -404,11 +415,11 @@ def run_auto_fill_in():
             })
 
 
-class FlaskConfig():
+class FlaskConfig(object):
     JOBS = [
         {
-            'id': 'run_auto_fill_in',
-            'func': 'app:run_auto_fill_in',
+            'id': 'timing_auto_fill_in',
+            'func': 'app:timing_auto_fill_in',
             'trigger': 'cron',
             'args': [],
             'minute': '5'
@@ -423,40 +434,20 @@ app.config.from_object(FlaskConfig)
 
 def init_scheduler_once():
     scheduler = APScheduler()
-    if platform_sys() == 'Linux':
-        fcntl = __import__("fcntl")
-        f = open('scheduler.lock', 'wb')
-        try:
-            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            scheduler.init_app(app)
-            scheduler.start()
-        except Exception as lock_e:
-            app.logger.warning(lock_e)
+    fcntl = __import__("fcntl")
+    f = open('scheduler.lock', 'wb')
+    try:
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        scheduler.init_app(app)
+        scheduler.start()
+    except Exception as lock_e:
+        app.logger.warning(lock_e)
 
-        def unlock():
-            fcntl.flock(f, fcntl.LOCK_UN)
-            f.close()
+    def unlock():
+        fcntl.flock(f, fcntl.LOCK_UN)
+        f.close()
 
-        atexit_reg(unlock)
-
-    elif platform_sys() == 'Windows':
-        msvcrt = __import__('msvcrt')
-        f = open('scheduler.lock', 'wb')
-        try:
-            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
-            scheduler.init_app(app)
-            scheduler.start()
-        except Exception as lock_e:
-            app.logger.warning(lock_e)
-
-        def unlock_():
-            try:
-                f.seek(0)
-                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
-            except Exception as unlock_e:
-                app.logger.warning(unlock_e)
-
-        atexit_reg(unlock_)
+    atexit_reg(unlock)
 
 
 def close_db():
@@ -472,7 +463,7 @@ if __name__ == '__main__':
     # init_scheduler_once()
     app.run(host='0.0.0.0', port=5015)
 else:
+    init_scheduler_once()
     gunicorn_logger = logging.getLogger('gunicorn.error')
     app.logger.handlers = gunicorn_logger.handlers
     app.logger.setLevel(gunicorn_logger.level)
-    init_scheduler_once()

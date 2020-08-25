@@ -19,6 +19,21 @@ def bson_to_obj(o):
     return json.loads(json_util.dumps(o))
 
 
+def check_params(params_dict: dict, keys: tuple, method='all'):
+    if method == 'all':
+        for key in keys:
+            if key not in params_dict.keys():
+                return False
+        return True
+    elif method == 'have_one':
+        for key in keys:
+            if key in params_dict.keys():
+                return True
+        return False
+    else:
+        return False
+
+
 def gene_captcha_str():
     base_char = 'qwertyuiopasdfghjklzxcvbnm' \
                 'QWERTYUIOPASDFGHJKLZXCVBNM' \
