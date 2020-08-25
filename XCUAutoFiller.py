@@ -29,7 +29,7 @@ class XCUAutoFiller(object):
         self._TIME_MAPPING = {
             'morning': range(6, 12),
             'afternoon': range(12, 18),
-            'evening': range(18, 24),
+            'evening': range(18, 23),
         }
 
         self._driver = None
@@ -38,12 +38,7 @@ class XCUAutoFiller(object):
         self._this_running_timestamp = 0
 
         self._opts = webdriver.ChromeOptions()
-        self._opts.add_argument('user-agent=Mozilla/5.0 (Linux; Android 9; '
-                                'COR-AL10 Build/HUAWEICOR-AL10; wv) '
-                                'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 '
-                                'Chrome/78.0.3904.62 XWEB/2581 MMWEBSDK/200701 Mobile '
-                                'Safari/537.36 MMWEBID/259 MicroMessenger/7.0.17.1720(0x27001139) '
-                                'Process/toolsmp WeChat/arm64 NetType/WIFI Language/zh_CN ABI/arm64')
+        self._opts.add_argument(f'user-agent={self._get_rand_ua()}')
         if platform_sys() == 'Linux':
             self._opts.add_argument('--disable-gpu')
             self._opts.add_argument("window-size=1024,768")
@@ -64,8 +59,14 @@ class XCUAutoFiller(object):
                      f'{msg}\n'
 
     @staticmethod
+    def _get_rand_ua():
+        with open('ua_list.txt', mode='r') as fp:
+            uas = fp.readlines()
+            return uas[randint(0, len(uas))]
+
+    @staticmethod
     def _get_formatted_time():
-        return strftime("%Y-%m-%d %H:%M:%S", localtime())
+        return strftime('%Y-%m-%d %H:%M:%S', localtime())
 
     @property
     def log(self):

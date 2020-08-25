@@ -148,6 +148,7 @@ def signup():
         }
 
         now_hour = localtime(time()).tm_hour
+        now_minute = localtime(time()).tm_min
 
         new_user = {
             'sid': sid,
@@ -157,11 +158,11 @@ def signup():
             'is_pw_wrong': False,
             'is_up': {
                 'morning': const_.UP_STATUS.UNKNOWN
-                if now_hour > 12
+                if now_hour > 12 or (now_hour == 11 and now_minute > 5)
                 else const_.UP_STATUS.NOT_UP,
 
                 'afternoon': const_.UP_STATUS.UNKNOWN
-                if now_hour > 18
+                if now_hour > 18 or (now_hour == 17 and now_minute > 5)
                 else const_.UP_STATUS.NOT_UP,
 
                 'evening': const_.UP_STATUS.NOT_UP
@@ -364,7 +365,7 @@ def run_auto_fill_in():
         '_id': False
     })
     if not sys_params.get('has_err_info'):
-        if localtime(time()).tm_hour in range(8, 24):
+        if localtime(time()).tm_hour in range(8, 23):
             try:
                 filler = XCUAutoFiller(headless=True)
                 filler.users = util.bson_to_obj(user_col.find({}, {'_id': False}))

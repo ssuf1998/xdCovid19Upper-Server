@@ -33,7 +33,7 @@ def do_keep():
     })
 
     if not sys_params.get('has_err_info'):
-        if localtime(time()).tm_hour in range(8, 24):
+        if localtime(time()).tm_hour in range(8, 23):
             try:
                 last_suc_timestamp = int(sys_params.get('last_suc_timestamp'))
 
