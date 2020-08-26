@@ -368,6 +368,38 @@ def check_captcha():
     })
 
 
+def a_user_fill_finished(**kwargs):
+    user = kwargs.get('user')
+    if user:
+        user_col.update_one({
+            'sid': user['sid']
+        }, {
+            '$set': {
+                'is_pw_wrong': user['is_pw_wrong'],
+                'is_up': user['is_up'],
+            }
+        })
+
+
+def run_auto_fill_in(wanna_fill_users):
+    try:
+        filler = XCUAutoFiller()
+        filler.users = wanna_fill_users
+        filler.run(a_user_fill_finished)
+
+        with open('./log/auto_filler.log', mode='a') as fp:
+            fp.write(filler.log)
+        sys_col.update_one({
+            '_id': ObjectId('5f4259d3e091c53e98b17847')
+        }, {
+            '$set': {
+                'last_suc_timestamp': filler.this_running_timestamp
+            }
+        })
+    except Exception as auto_fill_e:
+        app.logger.error(auto_fill_e)
+
+
 def timing_auto_fill_in():
     sys_params = sys_col.find_one({
         '_id': ObjectId('5f4259d3e091c53e98b17847')
@@ -376,34 +408,7 @@ def timing_auto_fill_in():
         '_id': False
     })
     if not sys_params.get('has_err_info'):
-        if localtime(time()).tm_hour in range(8, 23):
-            try:
-                filler = XCUAutoFiller(headless=True)
-                filler.users = util.bson_to_obj(user_col.find({}, {'_id': False}))
-                filler.run()
-                for user in filler.users:
-                    user_col.update_one({
-                        'sid': user['sid']
-                    }, {
-                        '$set': {
-                            'is_pw_wrong': user['is_pw_wrong'],
-                            'is_up': user['is_up'],
-                        }
-                    })
-
-                with open('./log/auto_filler.log', mode='a') as fp:
-                    fp.write(filler.log)
-                sys_col.update_one({
-                    '_id': ObjectId('5f4259d3e091c53e98b17847')
-                }, {
-                    '$set': {
-                        'last_suc_timestamp': filler.this_running_timestamp
-                    }
-                })
-            except Exception as auto_fill_e:
-                app.logger.error(auto_fill_e)
-
-        elif localtime(time()).tm_hour == 0:
+        if localtime(time()).tm_hour == 0:
             user_col.update_many({}, {
                 '$set': {
                     'is_up': {
@@ -413,6 +418,8 @@ def timing_auto_fill_in():
                     }
                 }
             })
+        else:
+            run_auto_fill_in(util.bson_to_obj(user_col.find({}, {'_id': False})))
 
 
 class FlaskConfig(object):
@@ -422,6 +429,7 @@ class FlaskConfig(object):
             'func': 'app:timing_auto_fill_in',
             'trigger': 'cron',
             'args': [],
+            'hour': '8-22,0',
             'minute': '5'
         },
     ]
@@ -462,6 +470,7 @@ if not exists('./log'):
 if __name__ == '__main__':
     # init_scheduler_once()
     app.run(host='0.0.0.0', port=5015)
+    # run_auto_fill_in(util.bson_to_obj(user_col.find({}, {'_id': False})))
 else:
     init_scheduler_once()
     gunicorn_logger = logging.getLogger('gunicorn.error')

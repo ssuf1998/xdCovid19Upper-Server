@@ -19,6 +19,7 @@ from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
 import const_
+import util
 
 
 class XCUAutoFiller(object):
@@ -26,11 +27,6 @@ class XCUAutoFiller(object):
         self._UP_PAGE_URL = 'https://xxcapp.xidian.edu.cn/site/ncov/xidiandailyup'
         self._LOGIN_URL = f'https://xxcapp.xidian.edu.cn/uc/wap/login?redirect=' \
                           f'{quote(self._UP_PAGE_URL, safe="")}'
-        self._TIME_MAPPING = {
-            'morning': range(6, 12),
-            'afternoon': range(12, 18),
-            'evening': range(18, 23),
-        }
 
         self._driver = None
         self._log = ''
@@ -47,12 +43,6 @@ class XCUAutoFiller(object):
         elif platform_sys() == 'Windows':
             if headless:
                 self._opts.add_argument('--headless')
-
-    def _time_2_name(self) -> str:
-        hour = localtime(time()).tm_hour
-        for name, range_ in self._TIME_MAPPING.items():
-            if hour in range_:
-                return name
 
     def _write_log(self, sid, msg) -> None:
         self._log += f'[{self._get_formatted_time()}] [{sid}] ' \
@@ -84,18 +74,18 @@ class XCUAutoFiller(object):
     def this_running_timestamp(self):
         return self._this_running_timestamp
 
-    def run(self):
+    def run(self, on_a_user_fill_finished):
         if not self._driver:
             self._driver = webdriver.Chrome(options=self._opts,
                                             executable_path='./chromedriver')
-
+        time_name = util.time_2_name()
         for user in self._users:
             self._write_log(user['sid'],
                             'Starting auto fill-in...')
 
-            if user['is_up'][self._time_2_name()] == const_.UP_STATUS.OK:
+            if user['is_up'][time_name] == const_.UP_STATUS.OK:
                 self._write_log(user['sid'],
-                                f'Has already filled in {self._time_2_name()}, skipping...')
+                                f'Has already filled in {time_name}, skipping...')
                 continue
 
             if user['is_pause']:
@@ -129,8 +119,7 @@ class XCUAutoFiller(object):
                 try:
                     WebDriverWait(self._driver, 5).until(
                         expected_conditions.url_to_be(self._UP_PAGE_URL))
-                    if user['is_pw_wrong']:
-                        user['is_pw_wrong'] = False
+                    user['is_pw_wrong'] = False
 
                     try:
                         WebDriverWait(self._driver, 15).until(
@@ -149,10 +138,11 @@ class XCUAutoFiller(object):
 
                         try:
                             self._driver.find_element_by_css_selector('.form-mask')
-                            user['is_up'][self._time_2_name()] = const_.UP_STATUS.OK
+                            user['is_up'][time_name] = const_.UP_STATUS.OK
                             self._write_log(user['sid'],
                                             f'Updated latest up status for {user["sid"]}.')
                             sleep(3)
+                            on_a_user_fill_finished(user=user)
 
                         except NoSuchElementException:
                             radio_css_selector = '.form ul li [name="{name}"] > div' \
@@ -190,10 +180,11 @@ class XCUAutoFiller(object):
                                         (By.CSS_SELECTOR, '.hint-show .icon-chenggong')
                                     ))
 
-                                user['is_up'][self._time_2_name()] = const_.UP_STATUS.OK
+                                user['is_up'][time_name] = const_.UP_STATUS.OK
                                 self._write_log(user['sid'],
                                                 f'Filling of {user["sid"]} finished...')
                                 sleep(3)
+                                on_a_user_fill_finished(user=user)
 
                             except TimeoutException:
                                 self._write_log(user['sid'],
@@ -202,11 +193,13 @@ class XCUAutoFiller(object):
                     except TimeoutException:
                         self._write_log(user['sid'],
                                         'Logging timeout!')
+                        on_a_user_fill_finished(user=user)
 
                 except TimeoutException:
                     user['is_pw_wrong'] = True
                     self._write_log(user['sid'],
                                     'Login failed.')
+                    on_a_user_fill_finished(user=user)
 
             except TimeoutException:
                 self._write_log(user['sid'],

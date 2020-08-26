@@ -10,9 +10,12 @@ import base64
 import json
 from io import BytesIO
 from random import sample
+from time import localtime, time
 
 from bson import json_util
 from captcha.image import ImageCaptcha
+
+import const_
 
 
 def bson_to_obj(o):
@@ -50,3 +53,10 @@ def gene_captcha_b64img(captcha_str):
     img_buffer.close()
 
     return f'data:image/png;base64,{base64.b64encode(res).decode("utf-8")}'
+
+
+def time_2_name() -> str:
+    hour = localtime(time()).tm_hour
+    for name, range_ in const_.TIME_MAPPING.items():
+        if hour in range_:
+            return name

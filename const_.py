@@ -6,6 +6,11 @@
 @time: 2020/8/16 21:43
 @desc: xdCovid19Upper server's constants.
 """
+TIME_MAPPING = {
+    'morning': range(6, 12),
+    'afternoon': range(12, 18),
+    'evening': range(18, 23),
+}
 
 
 class DEFAULT_CODE:
