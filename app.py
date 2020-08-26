@@ -226,12 +226,6 @@ def get_user_info():
     sid = form_data.get('sid')
     pw = form_data.get('pw')
 
-    last_suc_timestamp = sys_col.find_one({
-        '_id': ObjectId('5f4259d3e091c53e98b17847')
-    }, {
-        'last_suc_timestamp': True
-    }).get('last_suc_timestamp')
-
     specific_user = user_col.find_one({
         'sid': sid,
         'pw': pw
@@ -246,13 +240,11 @@ def get_user_info():
         return jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
             'user_info': util.bson_to_obj(specific_user),
-            'last_ts': last_suc_timestamp
         })
     else:
         return jsonify({
             'code': const_.DEFAULT_CODE.FAILED,
             'user_info': None,
-            'last_ts': last_suc_timestamp
         })
 
 
@@ -322,6 +314,21 @@ def update_user_info():
         return jsonify({
             'code': const_.DEFAULT_CODE.FAILED,
         })
+
+
+@app.route('/getbasesysinfo', methods=['GET'])
+def get_base_sys_info():
+    base_sys_info = sys_col.find_one({
+        '_id': ObjectId('5f4259d3e091c53e98b17847')
+    }, {
+        'last_suc_timestamp': True,
+        'up_icons': True,
+    })
+
+    return jsonify({
+        'code': const_.DEFAULT_CODE.SUCCESS,
+        'data': util.bson_to_obj(base_sys_info),
+    })
 
 
 @app.route('/captcha', methods=['GET'])
