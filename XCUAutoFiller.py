@@ -52,7 +52,7 @@ class XCUAutoFiller(object):
     def _get_rand_ua():
         with open('ua_list.txt', mode='r') as fp:
             uas = fp.readlines()
-            return uas[randint(0, len(uas))]
+            return uas[randint(0, len(uas) - 1)]
 
     @staticmethod
     def _get_formatted_time():
@@ -172,7 +172,7 @@ class XCUAutoFiller(object):
                                 self._driver.find_element_by_css_selector(
                                     radio_css_selector.format(name='sfyzz', n=2)).click()
                                 sleep(1)
-                                # self._driver.find_element_by_css_selector('.footers a').click()
+                                self._driver.find_element_by_css_selector('.footers a').click()
 
                                 try:
                                     WebDriverWait(self._driver, 5).until(
