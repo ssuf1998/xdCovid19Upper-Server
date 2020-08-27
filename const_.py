@@ -22,7 +22,7 @@ class DEFAULT_CODE:
 class CHECK:
     NORMAL = 0
     DB_NO_RESPONSE = 1
-    ADMIN_ERR = 999
+    ADMIN_ERR = -1
 
 
 class SIGNUP_CHECK:

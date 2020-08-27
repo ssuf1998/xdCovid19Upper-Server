@@ -15,7 +15,7 @@ from time import localtime, time
 
 import pymongo
 from bson.objectid import ObjectId
-from flask import Flask, jsonify
+from flask import Flask, jsonify, make_response
 from flask import request as flask_req
 from flask_apscheduler import APScheduler
 from flask_cors import CORS
@@ -52,12 +52,13 @@ def check():
             'id': False,
             'last_suc_timestamp': False
         })
+
         if sys_params.get('has_err_info'):
-            return jsonify({
+            return make_response(jsonify({
                 'code': const_.CHECK.ADMIN_ERR,
                 'msg': sys_params.get('err_info').get('msg'),
                 'raw': sys_params.get('err_info').get('raw_err'),
-            })
+            }), 403)
 
         return jsonify({
             'code': const_.CHECK.NORMAL,
@@ -65,11 +66,11 @@ def check():
             'raw': '',
         })
     except ServerSelectionTimeoutError:
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.CHECK.DB_NO_RESPONSE,
             'msg': '',
             'raw': 'Database is not responding.',
-        })
+        }), 500)
 
 
 @app.route('/isnewuser', methods=['POST'])
@@ -79,22 +80,25 @@ def is_new_user():
     sid = form_data.get('sid')
 
     if not sid:
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.PARAMS_ERROR,
-            'bool': None
-        })
+            'bool': None,
+            'msg': '参数错误。'
+        }), 400)
 
     if user_col.count_documents({
         'sid': sid
     }) == 0:
         return jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
-            'bool': True
+            'bool': True,
+            'msg': ''
         })
     else:
         return jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
-            'bool': False
+            'bool': False,
+            'msg': ''
         })
 
 
@@ -105,10 +109,11 @@ def signup():
     if not util.check_params(
             form_data,
             ('code', 'sid', 'pw')):
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.PARAMS_ERROR,
-            'valid': const_.SIGNUP_CHECK.UNKNOWN
-        })
+            'valid': const_.SIGNUP_CHECK.UNKNOWN,
+            'msg': '参数错误。'
+        }), 403)
 
     client_code = form_data.get('code')
     sid = form_data.get('sid')
@@ -117,10 +122,11 @@ def signup():
     if user_col.count_documents({
         'sid': sid
     }) != 0:
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.FAILED,
-            'valid': const_.SIGNUP_CHECK.UNKNOWN
-        })
+            'valid': const_.SIGNUP_CHECK.UNKNOWN,
+            'msg': '请勿重复注册。'
+        }), 403)
 
     server_code = invitation_col.find_one({
         'code': client_code
@@ -129,15 +135,17 @@ def signup():
     })
 
     if not server_code:
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
-            'valid': const_.SIGNUP_CHECK.INVALID
-        })
+            'valid': const_.SIGNUP_CHECK.INVALID,
+            'msg': '邀请码无效。'
+        }))
     elif server_code['times'] == 0:
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
-            'valid': const_.SIGNUP_CHECK.OUTDATED
-        })
+            'valid': const_.SIGNUP_CHECK.OUTDATED,
+            'msg': '邀请码已过期。'
+        }))
     else:
         times = server_code['times'] - 1 \
             if server_code['times'] > 0 \
@@ -179,10 +187,11 @@ def signup():
             }
         })
 
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
-            'valid': const_.SIGNUP_CHECK.NORMAL
-        })
+            'valid': const_.SIGNUP_CHECK.NORMAL,
+            'msg': ''
+        }))
 
 
 @app.route('/login', methods=['POST'])
@@ -192,9 +201,10 @@ def login():
     if not util.check_params(
             form_data,
             ('sid', 'pw')):
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.PARAMS_ERROR,
-        })
+            'msg': '参数错误。'
+        }), 400)
 
     sid = form_data.get('sid')
     pw = form_data.get('pw')
@@ -203,13 +213,15 @@ def login():
         'sid': sid,
         'pw': pw
     }):
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
-        })
+            'msg': '登录成功。'
+        }))
     else:
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.FAILED,
-        })
+            'msg': '学号或密码错误，请核对后重试！'
+        }), 403)
 
 
 @app.route('/getuserinfo', methods=['POST'])
@@ -219,9 +231,10 @@ def get_user_info():
     if not util.check_params(
             form_data,
             ('sid', 'pw')):
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.PARAMS_ERROR,
-        })
+            'msg': '参数错误。'
+        }), 400)
 
     sid = form_data.get('sid')
     pw = form_data.get('pw')
@@ -237,15 +250,15 @@ def get_user_info():
     })
 
     if specific_user:
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
             'user_info': util.bson_to_obj(specific_user),
-        })
+        }))
     else:
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.FAILED,
             'user_info': None,
-        })
+        }), 404)
 
 
 @app.route('/deluser', methods=['POST'])
@@ -255,9 +268,10 @@ def del_user():
     if not util.check_params(
             form_data,
             ('sid', 'pw')):
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.PARAMS_ERROR,
-        })
+            'msg': '参数错误。'
+        }), 400)
 
     sid = form_data.get('sid')
     pw = form_data.get('pw')
@@ -268,13 +282,15 @@ def del_user():
     }).deleted_count
 
     if count:
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
-        })
+            'msg': ''
+        }))
     else:
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.FAILED,
-        })
+            'msg': '未知错误，可能数据库正忙。'
+        }))
 
 
 @app.route('/updateuserinfo', methods=['POST'])
@@ -284,20 +300,23 @@ def update_user_info():
     if not util.check_params(
             form_data,
             ('sid', 'pw', 'new_user_info')):
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.PARAMS_ERROR,
-        })
+            'msg': '参数错误。'
+        }), 400)
 
     sid = form_data.get('sid')
     pw = form_data.get('pw')
     new_user_info = form_data.get('new_user_info')
 
-    if (new_user_info.get('pw') is None and
-            new_user_info.get('coords') is None and
-            new_user_info.get('is_pause') is None):
-        return jsonify({
+    if not util.check_params(
+            new_user_info,
+            ('pw', 'coords', 'is_pause'),
+            method='have_one'):
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.PARAMS_ERROR,
-        })
+            'msg': '参数错误。'
+        }), 400)
 
     count = user_col.update_one({
         'sid': sid,
@@ -307,13 +326,15 @@ def update_user_info():
     }).matched_count
 
     if count:
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
-        })
+            'msg': '参数错误。'
+        }))
     else:
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.FAILED,
-        })
+            'msg': '未知错误，可能数据库正忙。'
+        }))
 
 
 @app.route('/getbasesysinfo', methods=['GET'])
@@ -325,10 +346,10 @@ def get_base_sys_info():
         'up_icons': True,
     })
 
-    return jsonify({
+    return make_response(jsonify({
         'code': const_.DEFAULT_CODE.SUCCESS,
-        'data': util.bson_to_obj(base_sys_info),
-    })
+        'info': util.bson_to_obj(base_sys_info),
+    }))
 
 
 @app.route('/captcha', methods=['GET'])
@@ -336,20 +357,20 @@ def captcha():
     captcha_id = flask_req.args.get('cid')
 
     if not captcha_id:
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.PARAMS_ERROR,
             'img': ''
-        })
+        }), 400)
 
     captcha_str = util.gene_captcha_str()
     captcha_b64img = util.gene_captcha_b64img(captcha_str)
 
     captcha_dict[captcha_id] = captcha_str.lower()
 
-    return jsonify({
+    return make_response(jsonify({
         'code': const_.DEFAULT_CODE.SUCCESS,
         'img': captcha_b64img
-    })
+    }))
 
 
 @app.route('/checkcaptcha', methods=['GET'])
@@ -357,21 +378,24 @@ def check_captcha():
     if not util.check_params(
             flask_req.args,
             ('v', 'cid')):
-        return jsonify({
+        return make_response(jsonify({
             'code': const_.DEFAULT_CODE.PARAMS_ERROR,
-        })
+            'msg': '参数错误。'
+        }), 400)
 
     client_captcha = flask_req.args.get('v')
     captcha_id = flask_req.args.get('cid')
 
     if client_captcha.lower() != captcha_dict.get(captcha_id):
-        return jsonify({
-            'code': const_.DEFAULT_CODE.FAILED
-        })
+        return make_response(jsonify({
+            'code': const_.DEFAULT_CODE.FAILED,
+            'msg': '验证码错误。'
+        }))
 
     captcha_dict.pop(captcha_id)
     return jsonify({
-        'code': const_.DEFAULT_CODE.SUCCESS
+        'code': const_.DEFAULT_CODE.SUCCESS,
+        'msg': ''
     })
 
 
@@ -476,8 +500,8 @@ if not exists('./log'):
 
 if __name__ == '__main__':
     # init_scheduler_once()
-    app.run(host='0.0.0.0', port=5015)
-    # run_auto_fill_in(util.bson_to_obj(user_col.find({}, {'_id': False})))
+    # app.run(host='0.0.0.0', port=5015)
+    run_auto_fill_in(util.bson_to_obj(user_col.find({}, {'_id': False})))
 else:
     init_scheduler_once()
     gunicorn_logger = logging.getLogger('gunicorn.error')

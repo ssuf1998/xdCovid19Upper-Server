@@ -149,46 +149,57 @@ class XCUAutoFiller(object):
                                                  ' div:nth-child({n}) span:first-child'
 
                             self._driver.find_element_by_css_selector('.form ul li [name="area"]').click()
-                            sleep(1)
-                            self._driver.find_elements_by_css_selector('.form ul li [name="tw"] > div div')[
-                                randint(2, 3)].click()
-                            sleep(1)
-
-                            self._driver.find_element_by_css_selector(
-                                radio_css_selector.format(name='ymtys', n=1)).click()
-                            sleep(1)
-                            self._driver.find_element_by_css_selector(
-                                radio_css_selector.format(name='sfzx', n=1)).click()
-                            sleep(1)
-                            self._driver.find_element_by_css_selector(
-                                radio_css_selector.format(name='sfcyglq', n=2)).click()
-                            sleep(1)
-                            self._driver.find_element_by_css_selector(
-                                radio_css_selector.format(name='sfyzz', n=2)).click()
-                            sleep(1)
-                            self._driver.find_element_by_css_selector('.footers a').click()
 
                             try:
-                                WebDriverWait(self._driver, 5).until(
-                                    expected_conditions.presence_of_element_located(
-                                        (By.CSS_SELECTOR, '#wapcf')
-                                    ))
-                                self._driver.find_element_by_css_selector('.wapcf-btn.wapcf-btn-ok').click()
-
                                 WebDriverWait(self._driver, 10).until(
-                                    expected_conditions.presence_of_element_located(
-                                        (By.CSS_SELECTOR, '.hint-show .icon-chenggong')
+                                    expected_conditions.invisibility_of_element(
+                                        (By.CSS_SELECTOR, '#page-loading-container')
                                     ))
 
-                                user['is_up'][time_name] = const_.UP_STATUS.OK
-                                self._write_log(user['sid'],
-                                                f'Filling of {user["sid"]} finished...')
-                                sleep(3)
-                                on_a_user_fill_finished(user=user)
+                                self._driver.find_elements_by_css_selector('.form ul li [name="tw"] > div div')[
+                                    randint(2, 3)].click()
+                                sleep(1)
+
+                                self._driver.find_element_by_css_selector(
+                                    radio_css_selector.format(name='ymtys', n=1)).click()
+                                sleep(1)
+                                self._driver.find_element_by_css_selector(
+                                    radio_css_selector.format(name='sfzx', n=1)).click()
+                                sleep(1)
+                                self._driver.find_element_by_css_selector(
+                                    radio_css_selector.format(name='sfcyglq', n=2)).click()
+                                sleep(1)
+                                self._driver.find_element_by_css_selector(
+                                    radio_css_selector.format(name='sfyzz', n=2)).click()
+                                sleep(1)
+                                # self._driver.find_element_by_css_selector('.footers a').click()
+
+                                try:
+                                    WebDriverWait(self._driver, 5).until(
+                                        expected_conditions.presence_of_element_located(
+                                            (By.CSS_SELECTOR, '#wapcf')
+                                        ))
+                                    self._driver.find_element_by_css_selector('.wapcf-btn.wapcf-btn-ok').click()
+
+                                    WebDriverWait(self._driver, 10).until(
+                                        expected_conditions.presence_of_element_located(
+                                            (By.CSS_SELECTOR, '.hint-show .icon-chenggong')
+                                        ))
+
+                                    user['is_up'][time_name] = const_.UP_STATUS.OK
+                                    self._write_log(user['sid'],
+                                                    f'Filling of {user["sid"]} finished...')
+                                    sleep(3)
+                                    on_a_user_fill_finished(user=user)
+
+                                except TimeoutException:
+                                    self._write_log(user['sid'],
+                                                    'Submitting timeout!')
 
                             except TimeoutException:
                                 self._write_log(user['sid'],
-                                                'Submitting timeout!')
+                                                'Getting position timeout!')
+                                on_a_user_fill_finished(user=user)
 
                     except TimeoutException:
                         self._write_log(user['sid'],
