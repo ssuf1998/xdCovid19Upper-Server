@@ -1,10 +1,10 @@
 # xdCovid19Upper Server
 
-![GPL_v3](https://img.shields.io/badge/GPL-v3-blue) ![author_ssuf1998](https://img.shields.io/badge/author-ssuf1998-red) ![version_0.5.20.b1](https://img.shields.io/badge/version-0.5.20.b1-green)
+![GPL_v3](https://img.shields.io/badge/GPL-v3-blue) ![author_ssuf1998](https://img.shields.io/badge/author-ssuf1998-red) ![version_0.5.21](https://img.shields.io/badge/version-0.5.21-green)
 
 ![xcu_server](https://img.shields.io/badge/xcu-server-9cf)
 
-🌟这是 *西电晨午晚检自动填报器* 的后端仓库。
+🌟 这是 [西电晨午晚检自动填报器](https://xcu.vesuvianite.work/#/home) 的前端仓库。
 
 如果你在找前端仓库，可以点击 [这里](https://github.com/ssuf1998/xdCovid19Upper-Client) 。
 

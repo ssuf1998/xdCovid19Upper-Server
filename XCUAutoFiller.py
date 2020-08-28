@@ -20,10 +20,16 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 import const_
 import util
+from EventMgr import EventMgr
 
 
-class XCUAutoFiller(object):
+class XCUAutoFiller(EventMgr):
     def __init__(self, headless=False) -> None:
+        super().__init__((
+            'one_finished',
+            'one_started',
+        ))
+
         self._UP_PAGE_URL = 'https://xxcapp.xidian.edu.cn/site/ncov/xidiandailyup'
         self._LOGIN_URL = f'https://xxcapp.xidian.edu.cn/uc/wap/login?redirect=' \
                           f'{quote(self._UP_PAGE_URL, safe="")}'
@@ -74,7 +80,7 @@ class XCUAutoFiller(object):
     def this_running_timestamp(self):
         return self._this_running_timestamp
 
-    def run(self, on_a_user_fill_finished):
+    def run(self):
         if not self._driver:
             self._driver = webdriver.Chrome(options=self._opts,
                                             executable_path='./chromedriver')
@@ -83,29 +89,36 @@ class XCUAutoFiller(object):
             self._write_log(user['sid'],
                             'Starting auto fill-in...')
 
-            if user['is_up'][time_name] == const_.UP_STATUS.OK:
-                self._write_log(user['sid'],
-                                f'Has already filled in {time_name}, skipping...')
-                continue
-
+            # 填报暂停走这里
             if user['is_pause']:
                 self._write_log(user['sid'],
                                 'Auto fill-in is paused, skipping...')
                 continue
 
+            # 数据库里知道已经填报了，跳过
+            if user['is_up'][time_name] == const_.UP_STATUS.OK:
+                self._write_log(user['sid'],
+                                f'Has already filled in {time_name}, skipping...')
+                continue
+
+            # 正式开填，先把Cookies清了
             self._driver.delete_all_cookies()
             self._driver.get(self._LOGIN_URL)
+            # 这里留着做“正在填报”状态的提示
+            # self.fire('one_started', user=user)
 
             pw = user['pw']
             fake_lat = user['coords']['latitude']
             fake_long = user['coords']['longitude']
 
             try:
+                # 判断页面进去没，没进去的话日志出“进入失败”
                 WebDriverWait(self._driver, 5).until(
                     expected_conditions.presence_of_element_located(
                         (By.CSS_SELECTOR, 'input[placeholder="账号"]')
                     ))
 
+                # 拿账号、密码元素
                 self._driver.find_element_by_css_selector(
                     'input[placeholder="账号"]').send_keys(user['sid'])
                 sleep(1)
@@ -114,19 +127,23 @@ class XCUAutoFiller(object):
                     'input[placeholder="密码"]').send_keys(pw)
                 sleep(1)
 
+                # 点登录
                 self._driver.find_element_by_css_selector('.btn').click()
 
                 try:
+                    # 等进入填报界面，如果进不去，就是密码错了
                     WebDriverWait(self._driver, 5).until(
                         expected_conditions.url_to_be(self._UP_PAGE_URL))
                     user['is_pw_wrong'] = False
 
                     try:
+                        # 成功进入填报界面，等界面加载下
                         WebDriverWait(self._driver, 15).until(
                             expected_conditions.invisibility_of_element(
                                 (By.CSS_SELECTOR, '#progress_loading')
                             ))
 
+                        # 注入假的地理位置
                         self._driver.execute_script(
                             'window.navigator.geolocation.getCurrentPosition=function(success){' +
                             'let position = {"coords" : {"latitude": "%s","longitude": "%s"}};'
@@ -137,60 +154,79 @@ class XCUAutoFiller(object):
                                         'Injecting a fake coordinate succeed.')
 
                         try:
+                            # 如果是出现了遮罩，那就是数据库里没有更新上“已经填报”的这个状态
                             self._driver.find_element_by_css_selector('.form-mask')
                             user['is_up'][time_name] = const_.UP_STATUS.OK
                             self._write_log(user['sid'],
                                             f'Updated latest up status for {user["sid"]}.')
                             sleep(3)
-                            on_a_user_fill_finished(user=user)
+                            self.fire('one_finished', user=user)
 
                         except NoSuchElementException:
+                            # 拿底下几个单选框的选择器模板
                             radio_css_selector = '.form ul li [name="{name}"] > div' \
                                                  ' div:nth-child({n}) span:first-child'
 
+                            # 点一下获取地理位置
                             self._driver.find_element_by_css_selector('.form ul li [name="area"]').click()
 
                             try:
+                                # 这里等地理位置获取一会儿，超时了就说明拿不到地理位置，输出给日志
                                 WebDriverWait(self._driver, 10).until(
                                     expected_conditions.invisibility_of_element(
                                         (By.CSS_SELECTOR, '#page-loading-container')
                                     ))
 
+                                # 体温单选框，随机在36.5-37.3这两个选项里选
                                 self._driver.find_elements_by_css_selector('.form ul li [name="tw"] > div div')[
                                     randint(2, 3)].click()
                                 sleep(1)
 
+                                # 一码通颜色单选框，当然是选择绿码第一个咯
                                 self._driver.find_element_by_css_selector(
                                     radio_css_selector.format(name='ymtys', n=1)).click()
                                 sleep(1)
+
+                                # 是否在校，填是
                                 self._driver.find_element_by_css_selector(
                                     radio_css_selector.format(name='sfzx', n=1)).click()
                                 sleep(1)
+
+                                # 是否处于隔离期，填否
                                 self._driver.find_element_by_css_selector(
                                     radio_css_selector.format(name='sfcyglq', n=2)).click()
                                 sleep(1)
+
+                                # 是否有症状，填否
                                 self._driver.find_element_by_css_selector(
                                     radio_css_selector.format(name='sfyzz', n=2)).click()
                                 sleep(1)
+
+                                # 其他情况那个textarea，保留不管
+                                # 点提交按钮，会出一个是否确定的对话框
                                 self._driver.find_element_by_css_selector('.footers a').click()
 
                                 try:
+                                    # 等提交按钮出来，没出来出日志，submitting failed
                                     WebDriverWait(self._driver, 5).until(
                                         expected_conditions.presence_of_element_located(
                                             (By.CSS_SELECTOR, '#wapcf')
                                         ))
+                                    # 点确定提交对话框里的确定按钮
                                     self._driver.find_element_by_css_selector('.wapcf-btn.wapcf-btn-ok').click()
 
+                                    # 提交成功的回显，如果没出来依旧是出日志，submitting failed
                                     WebDriverWait(self._driver, 10).until(
                                         expected_conditions.presence_of_element_located(
                                             (By.CSS_SELECTOR, '.hint-show .icon-chenggong')
                                         ))
 
+                                    # 更新数据库咯
                                     user['is_up'][time_name] = const_.UP_STATUS.OK
                                     self._write_log(user['sid'],
                                                     f'Filling of {user["sid"]} finished...')
                                     sleep(3)
-                                    on_a_user_fill_finished(user=user)
+                                    self.fire('one_finished', user=user)
 
                                 except TimeoutException:
                                     self._write_log(user['sid'],
@@ -199,23 +235,25 @@ class XCUAutoFiller(object):
                             except TimeoutException:
                                 self._write_log(user['sid'],
                                                 'Getting position timeout!')
-                                on_a_user_fill_finished(user=user)
+                                self.fire('one_finished', user=user)
 
                     except TimeoutException:
                         self._write_log(user['sid'],
                                         'Logging timeout!')
-                        on_a_user_fill_finished(user=user)
+                        self.fire('one_finished', user=user)
 
                 except TimeoutException:
                     user['is_pw_wrong'] = True
                     self._write_log(user['sid'],
                                     'Login failed.')
-                    on_a_user_fill_finished(user=user)
+                    self.fire('one_finished', user=user)
 
             except TimeoutException:
                 self._write_log(user['sid'],
                                 f'Entering official website failed...')
 
+        # 退出无头浏览器，清掉它释放内存（虽然好像没必要……）
+        # 更新下运行成功时间
         self._driver.quit()
         self._driver = None
         self._write_log('_',

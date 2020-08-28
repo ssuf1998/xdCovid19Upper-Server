@@ -41,6 +41,7 @@ sys_col = data_db['sys']
 captcha_dict = {}
 
 
+# 用于检查服务器是否正常运行，数据库还好着不
 @app.route('/check', methods=['GET'])
 def check():
     try:
@@ -73,6 +74,7 @@ def check():
         }), 500)
 
 
+# 看是不是新用户
 @app.route('/isnewuser', methods=['POST'])
 def is_new_user():
     form_data = flask_req.form if len(flask_req.form) != 0 else json.loads(flask_req.data)
@@ -102,6 +104,7 @@ def is_new_user():
         })
 
 
+# 注册
 @app.route('/signup', methods=['POST'])
 def signup():
     form_data = flask_req.form if len(flask_req.form) != 0 else json.loads(flask_req.data)
@@ -194,6 +197,7 @@ def signup():
         }))
 
 
+# 登录
 @app.route('/login', methods=['POST'])
 def login():
     form_data = flask_req.form if len(flask_req.form) != 0 else json.loads(flask_req.data)
@@ -224,6 +228,7 @@ def login():
         }), 403)
 
 
+# 获取用户信息，包括填报状态啊等
 @app.route('/getuserinfo', methods=['POST'])
 def get_user_info():
     form_data = flask_req.form if len(flask_req.form) != 0 else json.loads(flask_req.data)
@@ -261,6 +266,7 @@ def get_user_info():
         }), 404)
 
 
+# 注销用户
 @app.route('/deluser', methods=['POST'])
 def del_user():
     form_data = flask_req.form if len(flask_req.form) != 0 else json.loads(flask_req.data)
@@ -293,6 +299,7 @@ def del_user():
         }))
 
 
+# 更新用户信息，改密码、暂停等功能
 @app.route('/updateuserinfo', methods=['POST'])
 def update_user_info():
     form_data = flask_req.form if len(flask_req.form) != 0 else json.loads(flask_req.data)
@@ -337,6 +344,8 @@ def update_user_info():
         }))
 
 
+# 获取基本的系统信息，比如最近成功运行时间
+# 还提供了自定义三次填报状态前的emoji的功能
 @app.route('/getbasesysinfo', methods=['GET'])
 def get_base_sys_info():
     base_sys_info = sys_col.find_one({
@@ -352,6 +361,7 @@ def get_base_sys_info():
     }))
 
 
+# 验证码生成，发给前端一个base64
 @app.route('/captcha', methods=['GET'])
 def captcha():
     captcha_id = flask_req.args.get('cid')
@@ -373,6 +383,7 @@ def captcha():
     }))
 
 
+# 验证码检验
 @app.route('/checkcaptcha', methods=['GET'])
 def check_captcha():
     if not util.check_params(
@@ -399,7 +410,8 @@ def check_captcha():
     })
 
 
-def a_user_fill_finished(**kwargs):
+# 当filler在填完一个用户后，会回调这个函数
+def one_user_fill_finished(**kwargs):
     user = kwargs.get('user')
     if user:
         user_col.update_one({
@@ -412,11 +424,13 @@ def a_user_fill_finished(**kwargs):
         })
 
 
+# 自动填报核心！
 def run_auto_fill_in(wanna_fill_users):
     try:
         filler = XCUAutoFiller()
+        filler.on('one_finished', one_user_fill_finished)
         filler.users = wanna_fill_users
-        filler.run(a_user_fill_finished)
+        filler.run()
 
         with open('./log/auto_filler.log', mode='a') as fp:
             fp.write(filler.log)
@@ -431,6 +445,10 @@ def run_auto_fill_in(wanna_fill_users):
         app.logger.error(auto_fill_e)
 
 
+# APSCHEDULE的定时任务
+# 8-22点是正常检查填报
+# 0点是全部还原为“暂未填报”状态
+# 其他时间休息~
 def timing_auto_fill_in():
     sys_params = sys_col.find_one({
         '_id': ObjectId('5f4259d3e091c53e98b17847')
@@ -453,6 +471,7 @@ def timing_auto_fill_in():
             run_auto_fill_in(util.bson_to_obj(user_col.find({}, {'_id': False})))
 
 
+# 定时填报任务定义，早上8点到晚上10点，还有0点，每到整点过5分就跑一次
 class FlaskConfig(object):
     JOBS = [
         {
@@ -471,6 +490,9 @@ class FlaskConfig(object):
 app.config.from_object(FlaskConfig)
 
 
+# 为了防止在gunicorn里一开，n个worker整的定时任务搞出n个来
+# 上个文件锁，就不会惹
+# 思路 https://blog.csdn.net/qq_22034353/article/details/89362959
 def init_scheduler_once():
     scheduler = APScheduler()
     fcntl = __import__("fcntl")
