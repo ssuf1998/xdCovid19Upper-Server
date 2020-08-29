@@ -412,7 +412,7 @@ def check_captcha():
 
 # 当filler在填完一个用户后，会回调这个函数
 def one_user_fill_finished(**kwargs):
-    user = kwargs.get('user')
+    user = kwargs.get('recall').get('user')
     if user:
         user_col.update_one({
             'sid': user['sid']

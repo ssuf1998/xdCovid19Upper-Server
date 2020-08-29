@@ -24,7 +24,7 @@ class EventMgr(object):
     def fire(self, listener_name, **kwargs):
         if listener_name in self._event_listeners:
             for f in self._event_listeners.get(listener_name):
-                f(kwargs=kwargs)
+                f(recall=kwargs)
 
     def on(self, listener_name, func) -> bool:
         if listener_name not in self._event_listeners:
