@@ -50,8 +50,8 @@ def check():
         sys_params = sys_col.find_one({
             '_id': ObjectId('5f4259d3e091c53e98b17847')
         }, {
-            'id': False,
-            'last_suc_timestamp': False
+            'has_err_info': True,
+            'err_info': True,
         })
 
         if sys_params.get('has_err_info'):
@@ -522,8 +522,8 @@ if not exists('./log'):
 
 if __name__ == '__main__':
     # init_scheduler_once()
-    # app.run(host='0.0.0.0', port=5015)
-    run_auto_fill_in(util.bson_to_obj(user_col.find({}, {'_id': False})))
+    app.run(host='0.0.0.0', port=5015)
+    # run_auto_fill_in(util.bson_to_obj(user_col.find({}, {'_id': False})))
 else:
     init_scheduler_once()
     gunicorn_logger = logging.getLogger('gunicorn.error')
