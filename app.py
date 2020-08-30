@@ -464,7 +464,7 @@ def timing_auto_fill_in():
         else:
             filler_ = {
                 f'is_up.{util.time_2_name()}': const_.UP_STATUS.NOT_UP,
-                'is_pw_wrong': False
+                'is_pw_wrong': True
             }
 
             if localtime(time()).tm_min != 5:
