@@ -9,7 +9,7 @@
 
 from platform import system as platform_sys
 from random import randint
-from time import sleep, localtime, time, strftime
+from time import sleep, localtime, strftime
 from urllib.parse import quote
 
 from selenium import webdriver
@@ -37,7 +37,6 @@ class XCUAutoFiller(EventMgr):
         self._driver = None
         self._log = ''
         self._users = []
-        self._this_running_timestamp = 0
 
         self._opts = webdriver.ChromeOptions()
         self._opts.add_argument(f'user-agent={self._get_rand_ua()}')
@@ -76,10 +75,6 @@ class XCUAutoFiller(EventMgr):
     def users(self, val):
         self._users = val
 
-    @property
-    def this_running_timestamp(self):
-        return self._this_running_timestamp
-
     def run(self):
         if not self._driver:
             self._driver = webdriver.Chrome(options=self._opts,
@@ -96,10 +91,10 @@ class XCUAutoFiller(EventMgr):
                 continue
 
             # 数据库里知道已经填报了，跳过
-            if user['is_up'][time_name] == const_.UP_STATUS.OK:
-                self._write_log(user['sid'],
-                                f'Has already filled in {time_name}, skipping...')
-                continue
+            # if user['is_up'][time_name] == const_.UP_STATUS.OK:
+            #     self._write_log(user['sid'],
+            #                     f'Has already filled in {time_name}, skipping...')
+            #     continue
 
             # 正式开填，先把Cookies清了
             self._driver.delete_all_cookies()
@@ -139,8 +134,8 @@ class XCUAutoFiller(EventMgr):
                     try:
                         # 成功进入填报界面，等界面加载下
                         WebDriverWait(self._driver, 15).until(
-                            expected_conditions.invisibility_of_element(
-                                (By.CSS_SELECTOR, '#progress_loading')
+                            expected_conditions.visibility_of_element_located(
+                                (By.CSS_SELECTOR, '.ncov-page')
                             ))
 
                         # 注入假的地理位置
@@ -258,4 +253,3 @@ class XCUAutoFiller(EventMgr):
         self._driver = None
         self._write_log('_',
                         f'All users are completely filled, closed.\n')
-        self._this_running_timestamp = int(time())

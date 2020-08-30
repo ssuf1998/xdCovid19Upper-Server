@@ -33,25 +33,24 @@ def do_keep():
     })
 
     if not sys_params.get('has_err_info'):
-        if localtime(time()).tm_hour in range(8, 23):
-            try:
-                last_suc_timestamp = int(sys_params.get('last_suc_timestamp'))
+        try:
+            last_suc_timestamp = int(sys_params.get('last_suc_timestamp'))
 
-                if int(time()) - last_suc_timestamp > 60 * 40:
-                    xcus_status_raw = popen('systemctl status xcu_server').read()
-                    xcus_status = re.search('(?<=Active: )(.*)(?= since)', xcus_status_raw)
-                    if xcus_status:
-                        xcus_status = xcus_status.group(0)
-                        with open('./log/xcu_server_keeper.log', mode='a') as fp:
-                            if xcus_status.find('active') != -1:
-                                popen('systemctl restart xcu_server')
-                                fp.write(f'[{strftime("%Y-%m-%d %H:%M:%S", localtime())}] restarted.\n')
-                            else:
-                                popen('systemctl start xcu_server')
-                                fp.write(f'[{strftime("%Y-%m-%d %H:%M:%S", localtime())}] started.\n')
+            if int(time()) - last_suc_timestamp > 60 * 26:
+                xcus_status_raw = popen('systemctl status xcu_server').read()
+                xcus_status = re.search('(?<=Active: )(.*)(?= since)', xcus_status_raw)
+                if xcus_status:
+                    xcus_status = xcus_status.group(0)
+                    with open('./log/xcu_server_keeper.log', mode='a') as fp:
+                        if xcus_status.find('active') != -1:
+                            popen('systemctl restart xcu_server')
+                            fp.write(f'[{strftime("%Y-%m-%d %H:%M:%S", localtime())}] restarted.\n')
+                        else:
+                            popen('systemctl start xcu_server')
+                            fp.write(f'[{strftime("%Y-%m-%d %H:%M:%S", localtime())}] started.\n')
 
-            except ServerSelectionTimeoutError:
-                pass
+        except ServerSelectionTimeoutError:
+            pass
 
 
 if not exists('./log'):
@@ -59,5 +58,10 @@ if not exists('./log'):
 
 if platform_sys() == 'Linux':
     scheduler = BlockingScheduler()
-    scheduler.add_job(do_keep, 'cron', minute='45')
+    scheduler.add_job(
+        do_keep,
+        'cron',
+        hour='8-22',
+        minute='30'
+    )
     scheduler.start()

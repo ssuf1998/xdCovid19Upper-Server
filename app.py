@@ -434,13 +434,6 @@ def run_auto_fill_in(wanna_fill_users):
 
         with open('./log/auto_filler.log', mode='a') as fp:
             fp.write(filler.log)
-        sys_col.update_one({
-            '_id': ObjectId('5f4259d3e091c53e98b17847')
-        }, {
-            '$set': {
-                'last_suc_timestamp': filler.this_running_timestamp
-            }
-        })
     except Exception as auto_fill_e:
         app.logger.error(auto_fill_e)
 
@@ -457,7 +450,7 @@ def timing_auto_fill_in():
         '_id': False
     })
     if not sys_params.get('has_err_info'):
-        if localtime(time()).tm_hour == 0:
+        if localtime(time()).tm_hour == 0 and localtime(time()).tm_min == 5:
             user_col.update_many({}, {
                 '$set': {
                     'is_up': {
@@ -467,11 +460,35 @@ def timing_auto_fill_in():
                     }
                 }
             })
+
         else:
-            run_auto_fill_in(util.bson_to_obj(user_col.find({}, {'_id': False})))
+            filler_ = {
+                f'is_up.{util.time_2_name()}': const_.UP_STATUS.NOT_UP,
+                'is_pw_wrong': False
+            }
+
+            if localtime(time()).tm_min != 5:
+                filler_.pop('is_pw_wrong')
+
+            fill_users = user_col.find(
+                filler_, {
+                    '_id': False
+                }
+            )
+
+            if not fill_users:
+                run_auto_fill_in(util.bson_to_obj(fill_users))
+
+        sys_col.update_one({
+            '_id': ObjectId('5f4259d3e091c53e98b17847')
+        }, {
+            '$set': {
+                'last_suc_timestamp': int(time())
+            }
+        })
 
 
-# 定时填报任务定义，早上8点到晚上10点，还有0点，每到整点过5分就跑一次
+# 定时填报任务定义
 class FlaskConfig(object):
     JOBS = [
         {
@@ -480,7 +497,7 @@ class FlaskConfig(object):
             'trigger': 'cron',
             'args': [],
             'hour': '8-22,0',
-            'minute': '5'
+            'minute': '5,25,45'
         },
     ]
 
@@ -522,8 +539,8 @@ if not exists('./log'):
 
 if __name__ == '__main__':
     # init_scheduler_once()
-    app.run(host='0.0.0.0', port=5015)
-    # run_auto_fill_in(util.bson_to_obj(user_col.find({}, {'_id': False})))
+    # app.run(host='0.0.0.0', port=5015)
+    timing_auto_fill_in()
 else:
     init_scheduler_once()
     gunicorn_logger = logging.getLogger('gunicorn.error')
