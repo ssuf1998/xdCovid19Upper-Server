@@ -476,16 +476,16 @@ def timing_auto_fill_in():
                 }
             )
 
-            if not fill_users:
+            if fill_users:
                 run_auto_fill_in(util.bson_to_obj(fill_users))
 
-        sys_col.update_one({
-            '_id': ObjectId('5f4259d3e091c53e98b17847')
-        }, {
-            '$set': {
-                'last_suc_timestamp': int(time())
-            }
-        })
+            sys_col.update_one({
+                '_id': ObjectId('5f4259d3e091c53e98b17847')
+            }, {
+                '$set': {
+                    'last_suc_timestamp': int(time())
+                }
+            })
 
 
 # 定时填报任务定义
@@ -496,7 +496,7 @@ class FlaskConfig(object):
             'func': 'app:timing_auto_fill_in',
             'trigger': 'cron',
             'args': [],
-            'hour': '8-22,0',
+            'hour': '7-22,0',
             'minute': '5,25,45'
         },
     ]

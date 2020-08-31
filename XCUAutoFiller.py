@@ -135,7 +135,7 @@ class XCUAutoFiller(EventMgr):
                         # 成功进入填报界面，等界面加载下
                         WebDriverWait(self._driver, 15).until(
                             expected_conditions.visibility_of_element_located(
-                                (By.CSS_SELECTOR, '.ncov-page')
+                                (By.CSS_SELECTOR, '.form ul li [name="area"]')
                             ))
 
                         # 注入假的地理位置
@@ -199,7 +199,7 @@ class XCUAutoFiller(EventMgr):
 
                                 # 其他情况那个textarea，保留不管
                                 # 点提交按钮，会出一个是否确定的对话框
-                                self._driver.find_element_by_css_selector('.footers a').click()
+                                # self._driver.find_element_by_css_selector('.footers a').click()
 
                                 try:
                                     # 等提交按钮出来，没出来出日志，submitting failed
