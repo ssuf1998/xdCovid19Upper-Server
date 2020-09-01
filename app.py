@@ -325,6 +325,9 @@ def update_user_info():
             'msg': '参数错误。'
         }), 400)
 
+    if pw:
+        new_user_info['is_pw_wrong'] = False
+
     count = user_col.update_one({
         'sid': sid,
         'pw': pw,
@@ -335,7 +338,7 @@ def update_user_info():
     if count:
         return make_response(jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
-            'msg': '参数错误。'
+            'msg': ''
         }))
     else:
         return make_response(jsonify({
@@ -462,19 +465,12 @@ def timing_auto_fill_in():
             })
 
         else:
-            filler_ = {
+            fill_users = user_col.find({
                 f'is_up.{util.time_2_name()}': const_.UP_STATUS.NOT_UP,
                 'is_pw_wrong': False
-            }
-
-            if localtime(time()).tm_min == 5:
-                filler_.pop('is_pw_wrong')
-
-            fill_users = user_col.find(
-                filler_, {
-                    '_id': False
-                }
-            )
+            }, {
+                '_id': False
+            })
 
             if fill_users:
                 run_auto_fill_in(util.bson_to_obj(fill_users))
@@ -496,7 +492,7 @@ class FlaskConfig(object):
             'func': 'app:timing_auto_fill_in',
             'trigger': 'cron',
             'args': [],
-            'hour': '7-22,0',
+            'hour': '6-22,0',
             'minute': '5,25,45'
         },
     ]

@@ -199,7 +199,7 @@ class XCUAutoFiller(EventMgr):
 
                                 # 其他情况那个textarea，保留不管
                                 # 点提交按钮，会出一个是否确定的对话框
-                                # self._driver.find_element_by_css_selector('.footers a').click()
+                                self._driver.find_element_by_css_selector('.footers a').click()
 
                                 try:
                                     # 等提交按钮出来，没出来出日志，submitting failed
@@ -238,10 +238,10 @@ class XCUAutoFiller(EventMgr):
                         self.fire('one_finished', user=user)
 
                 except TimeoutException:
-                    user['is_pw_wrong'] = True
+                    # user['is_pw_wrong'] = True
                     self._write_log(user['sid'],
                                     'Login failed.')
-                    self.fire('one_finished', user=user)
+                    # self.fire('one_finished', user=user)
 
             except TimeoutException:
                 self._write_log(user['sid'],
