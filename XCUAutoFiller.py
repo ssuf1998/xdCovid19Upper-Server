@@ -238,10 +238,10 @@ class XCUAutoFiller(EventMgr):
                         self.fire('one_finished', user=user)
 
                 except TimeoutException:
-                    # user['is_pw_wrong'] = True
+                    user['is_pw_wrong'] = True
                     self._write_log(user['sid'],
                                     'Login failed.')
-                    # self.fire('one_finished', user=user)
+                    self.fire('one_finished', user=user)
 
             except TimeoutException:
                 self._write_log(user['sid'],

@@ -453,16 +453,17 @@ def timing_auto_fill_in():
         '_id': False
     })
     if not sys_params.get('has_err_info'):
-        if localtime(time()).tm_hour == 0 and localtime(time()).tm_min == 5:
-            user_col.update_many({}, {
-                '$set': {
-                    'is_up': {
-                        'morning': const_.UP_STATUS.NOT_UP,
-                        'afternoon': const_.UP_STATUS.NOT_UP,
-                        'evening': const_.UP_STATUS.NOT_UP,
+        if localtime(time()).tm_hour == 0:
+            if localtime(time()).tm_min == 5:
+                user_col.update_many({}, {
+                    '$set': {
+                        'is_up': {
+                            'morning': const_.UP_STATUS.NOT_UP,
+                            'afternoon': const_.UP_STATUS.NOT_UP,
+                            'evening': const_.UP_STATUS.NOT_UP,
+                        }
                     }
-                }
-            })
+                })
 
         else:
             fill_users = user_col.find({
