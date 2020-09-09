@@ -37,6 +37,7 @@ class XCUAutoFiller(EventMgr):
         self._driver = None
         self._log = ''
         self._users = []
+        self._retry_users = []
 
         self._opts = webdriver.ChromeOptions()
         self._opts.add_argument(f'user-agent={self._get_rand_ua()}')
@@ -75,11 +76,16 @@ class XCUAutoFiller(EventMgr):
     def users(self, val):
         self._users = val
 
+    @property
+    def retry_users(self):
+        return self._retry_users
+
     def run(self):
         if not self._driver:
             self._driver = webdriver.Chrome(options=self._opts,
                                             executable_path='./chromedriver')
         time_name = util.time_2_name()
+        self._retry_users.clear()
         for user in self._users:
             self._write_log(user['sid'],
                             'Starting auto fill-in...')
@@ -99,8 +105,6 @@ class XCUAutoFiller(EventMgr):
             # 正式开填，先把Cookies清了
             self._driver.delete_all_cookies()
             self._driver.get(self._LOGIN_URL)
-            # 这里留着做“正在填报”状态的提示
-            # self.fire('one_started', user=user)
 
             pw = user['pw']
             fake_lat = user['coords']['latitude']
@@ -226,16 +230,17 @@ class XCUAutoFiller(EventMgr):
                                 except TimeoutException:
                                     self._write_log(user['sid'],
                                                     'Submitting timeout!')
+                                    self._retry_users.append(user)
 
                             except TimeoutException:
                                 self._write_log(user['sid'],
                                                 'Getting position timeout!')
-                                self.fire('one_finished', user=user)
+                                self._retry_users.append(user)
 
                     except TimeoutException:
                         self._write_log(user['sid'],
                                         'Logging timeout!')
-                        self.fire('one_finished', user=user)
+                        self._retry_users.append(user)
 
                 except TimeoutException:
                     user['is_pw_wrong'] = True
@@ -246,6 +251,7 @@ class XCUAutoFiller(EventMgr):
             except TimeoutException:
                 self._write_log(user['sid'],
                                 f'Entering official website failed...')
+                self._retry_users.append(user)
 
         # 退出无头浏览器，清掉它释放内存（虽然好像没必要……）
         # 更新下运行成功时间

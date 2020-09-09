@@ -358,6 +358,10 @@ def get_base_sys_info():
         'up_icons': True,
     })
 
+    if (not base_sys_info['up_icons']
+            or len(base_sys_info['up_icons']) == 0):
+        base_sys_info['up_icons'] = [':sunny:', ':coffee:', ':crescent_moon:']
+
     return make_response(jsonify({
         'code': const_.DEFAULT_CODE.SUCCESS,
         'info': util.bson_to_obj(base_sys_info),
@@ -430,10 +434,18 @@ def one_user_fill_finished(**kwargs):
 # 自动填报核心！
 def run_auto_fill_in(wanna_fill_users):
     try:
+        retry_times = 0
         filler = XCUAutoFiller()
         filler.on('one_finished', one_user_fill_finished)
-        filler.users = wanna_fill_users
-        filler.run()
+
+        while retry_times <= 3:
+            filler.users = wanna_fill_users if retry_times == 0 else filler.retry_users
+            filler.run()
+
+            if len(filler.retry_users) > 0:
+                retry_times += 1
+            else:
+                break
 
         with open('./log/auto_filler.log', mode='a') as fp:
             fp.write(filler.log)
@@ -442,9 +454,6 @@ def run_auto_fill_in(wanna_fill_users):
 
 
 # APSCHEDULE的定时任务
-# 8-22点是正常检查填报
-# 0点是全部还原为“暂未填报”状态
-# 其他时间休息~
 def timing_auto_fill_in():
     sys_params = sys_col.find_one({
         '_id': ObjectId('5f4259d3e091c53e98b17847')
