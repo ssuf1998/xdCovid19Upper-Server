@@ -9,6 +9,7 @@
 import json
 import logging
 from atexit import register as atexit_reg
+from copy import deepcopy
 from os import mkdir
 from os.path import exists
 from time import localtime, time
@@ -48,7 +49,7 @@ def check():
         db_client.server_info()
 
         sys_params = sys_col.find_one({
-            '_id': ObjectId('5f4259d3e091c53e98b17847')
+            'pretty_name': 'info'
         }, {
             'has_err_info': True,
             'err_info': True,
@@ -352,19 +353,47 @@ def update_user_info():
 @app.route('/getbasesysinfo', methods=['GET'])
 def get_base_sys_info():
     base_sys_info = sys_col.find_one({
-        '_id': ObjectId('5f4259d3e091c53e98b17847')
+        'pretty_name': 'info'
     }, {
         'last_suc_timestamp': True,
         'up_icons': True,
     })
 
-    if (not base_sys_info['up_icons']
-            or len(base_sys_info['up_icons']) == 0):
-        base_sys_info['up_icons'] = [':sunny:', ':coffee:', ':crescent_moon:']
+    # if (not base_sys_info['up_icons']
+    #         or len(base_sys_info['up_icons']) == 0):
+    #     base_sys_info['up_icons'] = [':sunny:', ':coffee:', ':crescent_moon:']
 
     return make_response(jsonify({
         'code': const_.DEFAULT_CODE.SUCCESS,
         'info': util.bson_to_obj(base_sys_info),
+    }))
+
+
+@app.route('/getversions', methods=['GET'])
+def get_versions():
+    versions = sys_col.find_one({
+        'pretty_name': 'info'
+    }, {
+        'versions': True,
+    })
+
+    return make_response(jsonify({
+        'code': const_.DEFAULT_CODE.SUCCESS,
+        'info': util.bson_to_obj(versions),
+    }))
+
+
+@app.route('/getqa', methods=['GET'])
+def get_qa():
+    qa = sys_col.find_one({
+        'pretty_name': 'qa'
+    }, {
+        'qa': True,
+    })
+
+    return make_response(jsonify({
+        'code': const_.DEFAULT_CODE.SUCCESS,
+        'data': util.bson_to_obj(qa),
     }))
 
 
@@ -439,7 +468,9 @@ def run_auto_fill_in(wanna_fill_users):
         filler.on('one_finished', one_user_fill_finished)
 
         while retry_times <= 3:
-            filler.users = wanna_fill_users if retry_times == 0 else filler.retry_users
+            filler.users = wanna_fill_users \
+                if retry_times == 0 \
+                else deepcopy(filler.retry_users)
             filler.run()
 
             if len(filler.retry_users) > 0:
@@ -456,7 +487,7 @@ def run_auto_fill_in(wanna_fill_users):
 # APSCHEDULE的定时任务
 def timing_auto_fill_in():
     sys_params = sys_col.find_one({
-        '_id': ObjectId('5f4259d3e091c53e98b17847')
+        'pretty_name': 'info'
     }, {
         'has_err_info': True,
         '_id': False
@@ -486,7 +517,7 @@ def timing_auto_fill_in():
                 run_auto_fill_in(util.bson_to_obj(fill_users))
 
             sys_col.update_one({
-                '_id': ObjectId('5f4259d3e091c53e98b17847')
+                'pretty_name': 'info'
             }, {
                 '$set': {
                     'last_suc_timestamp': int(time())
