@@ -12,10 +12,11 @@ from atexit import register as atexit_reg
 from copy import deepcopy
 from os import mkdir
 from os.path import exists
+from threading import Thread, Lock
+from random import shuffle
 from time import localtime, time
 
 import pymongo
-from bson.objectid import ObjectId
 from flask import Flask, jsonify, make_response
 from flask import request as flask_req
 from flask_apscheduler import APScheduler
@@ -40,6 +41,10 @@ invitation_col = data_db['invitation']
 sys_col = data_db['sys']
 
 captcha_dict = {}
+
+THREAD_USER_COUNT = 5
+filler_log = ''
+filler_log_lock = Lock()
 
 
 # 用于检查服务器是否正常运行，数据库还好着不
@@ -460,32 +465,59 @@ def one_user_fill_finished(**kwargs):
         })
 
 
+def auto_filler_thread(users, name_):
+    global filler_log
+
+    retry_times = 0
+    filler = XCUAutoFiller(thread_name=name_)
+    filler.on('one_finished', one_user_fill_finished)
+
+    while retry_times <= 3:
+        filler.users = users \
+            if retry_times == 0 \
+            else deepcopy(filler.retry_users)
+        filler.run()
+
+        if len(filler.retry_users) > 0:
+            retry_times += 1
+        else:
+            break
+
+    filler_log_lock.acquire()
+    filler_log += filler.log
+    filler_log_lock.release()
+
+
 # 自动填报核心！
-def run_auto_fill_in(wanna_fill_users):
+def run_auto_filler(wanna_fill_users):
     try:
-        retry_times = 0
-        filler = XCUAutoFiller()
-        filler.on('one_finished', one_user_fill_finished)
+        filler_thread_list = []
+        shuffle(wanna_fill_users)
+        thread_count = len(wanna_fill_users) // THREAD_USER_COUNT
+        if thread_count == 0:
+            thread_count += 1
 
-        while retry_times <= 3:
-            filler.users = wanna_fill_users \
-                if retry_times == 0 \
-                else deepcopy(filler.retry_users)
-            filler.run()
+        for i in range(thread_count):
+            left_ = i * THREAD_USER_COUNT
+            right_ = (i + 1) * THREAD_USER_COUNT
+            right_ = len(wanna_fill_users) if right_ > len(wanna_fill_users) else right_
+            t = Thread(target=auto_filler_thread,
+                       args=(wanna_fill_users[left_:right_], f'thread-{i + 1}'))
+            t.start()
+            filler_thread_list.append(t)
 
-            if len(filler.retry_users) > 0:
-                retry_times += 1
-            else:
-                break
+        for t in filler_thread_list:
+            t.join()
 
-        with open('./log/auto_filler.log', mode='a') as fp:
-            fp.write(filler.log)
+        with open('./log/auto_filler.log', mode='a', encoding='utf-8') as fp:
+            fp.write(filler_log)
+            fp.write('\n')
     except Exception as auto_fill_e:
         app.logger.error(auto_fill_e)
 
 
-# APSCHEDULE的定时任务
-def timing_auto_fill_in():
+# APSCHEDULER的定时任务
+def timing_auto_filler():
     sys_params = sys_col.find_one({
         'pretty_name': 'info'
     }, {
@@ -514,7 +546,7 @@ def timing_auto_fill_in():
             })
 
             if fill_users:
-                run_auto_fill_in(util.bson_to_obj(fill_users))
+                run_auto_filler(util.bson_to_obj(fill_users))
 
             sys_col.update_one({
                 'pretty_name': 'info'
@@ -529,8 +561,8 @@ def timing_auto_fill_in():
 class FlaskConfig(object):
     JOBS = [
         {
-            'id': 'timing_auto_fill_in',
-            'func': 'app:timing_auto_fill_in',
+            'id': 'timing_auto_filler',
+            'func': 'app:timing_auto_filler',
             'trigger': 'cron',
             'args': [],
             'hour': '6-22,0',
@@ -577,7 +609,7 @@ if not exists('./log'):
 if __name__ == '__main__':
     # init_scheduler_once()
     # app.run(host='0.0.0.0', port=5015)
-    timing_auto_fill_in()
+    timing_auto_filler()
 else:
     init_scheduler_once()
     gunicorn_logger = logging.getLogger('gunicorn.error')

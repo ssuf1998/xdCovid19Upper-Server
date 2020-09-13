@@ -24,7 +24,7 @@ from EventMgr import EventMgr
 
 
 class XCUAutoFiller(EventMgr):
-    def __init__(self, headless=False) -> None:
+    def __init__(self, headless=False, thread_name='') -> None:
         super().__init__((
             'one_finished',
             'one_started',
@@ -34,7 +34,6 @@ class XCUAutoFiller(EventMgr):
         self._LOGIN_URL = f'https://xxcapp.xidian.edu.cn/uc/wap/login?redirect=' \
                           f'{quote(self._UP_PAGE_URL, safe="")}'
 
-        self._driver = None
         self._log = ''
         self._users = []
         self._retry_users = []
@@ -50,8 +49,13 @@ class XCUAutoFiller(EventMgr):
             if headless:
                 self._opts.add_argument('--headless')
 
+        self._driver = webdriver.Chrome(options=self._opts,
+                                        executable_path='./chromedriver')
+
+        self._thread_name = thread_name
+
     def _write_log(self, sid, msg) -> None:
-        self._log += f'[{self._get_formatted_time()}] [{sid}] ' \
+        self._log += f'[{self._thread_name}] [{self._get_formatted_time()}] [{sid}] ' \
                      f'{msg}\n'
 
     @staticmethod
@@ -80,10 +84,11 @@ class XCUAutoFiller(EventMgr):
     def retry_users(self):
         return self._retry_users
 
+    @property
+    def thread_name(self):
+        return self._thread_name
+
     def run(self):
-        if not self._driver:
-            self._driver = webdriver.Chrome(options=self._opts,
-                                            executable_path='./chromedriver')
         time_name = util.time_2_name()
         self._retry_users.clear()
         for user in self._users:
@@ -95,12 +100,6 @@ class XCUAutoFiller(EventMgr):
                 self._write_log(user['sid'],
                                 'Auto fill-in is paused, skipping...')
                 continue
-
-            # 数据库里知道已经填报了，跳过
-            # if user['is_up'][time_name] == const_.UP_STATUS.OK:
-            #     self._write_log(user['sid'],
-            #                     f'Has already filled in {time_name}, skipping...')
-            #     continue
 
             # 正式开填，先把Cookies清了
             self._driver.delete_all_cookies()
@@ -258,4 +257,4 @@ class XCUAutoFiller(EventMgr):
         self._driver.quit()
         self._driver = None
         self._write_log('_',
-                        f'All users are completely filled, closed.\n')
+                        f'All users are completely filled, closed.')
