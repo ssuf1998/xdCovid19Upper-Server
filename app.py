@@ -541,9 +541,10 @@ def timing_auto_filler():
             }, {
                 '_id': False
             })
+            fill_users = util.bson_to_obj(fill_users)
 
             if fill_users:
-                run_auto_filler(util.bson_to_obj(fill_users))
+                run_auto_filler(fill_users)
 
             sys_col.update_one({
                 'pretty_name': 'info'
