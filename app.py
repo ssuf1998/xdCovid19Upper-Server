@@ -42,7 +42,7 @@ sys_col = data_db['sys']
 
 captcha_dict = {}
 
-THREAD_USER_COUNT = 5
+THREAD_USER_COUNT = 10
 filler_log = ''
 filler_log_lock = Lock()
 
@@ -364,10 +364,6 @@ def get_base_sys_info():
         'up_icons': True,
     })
 
-    # if (not base_sys_info['up_icons']
-    #         or len(base_sys_info['up_icons']) == 0):
-    #     base_sys_info['up_icons'] = [':sunny:', ':coffee:', ':crescent_moon:']
-
     return make_response(jsonify({
         'code': const_.DEFAULT_CODE.SUCCESS,
         'info': util.bson_to_obj(base_sys_info),
@@ -491,11 +487,10 @@ def auto_filler_thread(users, name_):
 # 自动填报核心！
 def run_auto_filler(wanna_fill_users):
     try:
+        global filler_log
         filler_thread_list = []
         shuffle(wanna_fill_users)
-        thread_count = len(wanna_fill_users) // THREAD_USER_COUNT
-        if thread_count == 0:
-            thread_count += 1
+        thread_count = len(wanna_fill_users) // THREAD_USER_COUNT + 1
 
         for i in range(thread_count):
             left_ = i * THREAD_USER_COUNT
@@ -512,6 +507,8 @@ def run_auto_filler(wanna_fill_users):
         with open('./log/auto_filler.log', mode='a', encoding='utf-8') as fp:
             fp.write(filler_log)
             fp.write('\n')
+
+        filler_log = ''
     except Exception as auto_fill_e:
         app.logger.error(auto_fill_e)
 
