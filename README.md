@@ -1,6 +1,8 @@
 # xdCovid19Upper Server
 
-![GPL_v3](https://img.shields.io/badge/GPL-v3-blue) ![author_ssuf1998](https://img.shields.io/badge/author-ssuf1998-red) ![version_0.6.3](https://img.shields.io/badge/version-0.6.3-green)
+![GPL_v3](https://img.shields.io/badge/GPL-v3-blue)
+ 
+ ![author_ssuf1998](https://img.shields.io/badge/author-ssuf1998-red)
 
 ![xcu_server](https://img.shields.io/badge/xcu-server-9cf)
 

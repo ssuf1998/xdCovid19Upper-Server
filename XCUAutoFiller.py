@@ -40,6 +40,10 @@ class XCUAutoFiller(EventMgr):
 
         self._opts = webdriver.ChromeOptions()
         self._opts.add_argument(f'user-agent={self._get_rand_ua()}')
+        self._opts.add_experimental_option('prefs', {
+            'profile.managed_default_content_settings.images': 2,
+            'permissions.default.stylesheet': 2
+        })
         if platform_sys() == 'Linux':
             self._opts.add_argument('--disable-gpu')
             self._opts.add_argument("window-size=1024,768")

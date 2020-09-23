@@ -42,7 +42,8 @@ sys_col = data_db['sys']
 
 captcha_dict = {}
 
-THREAD_USER_COUNT = 10
+THREAD_USER_MIN_COUNT = 1
+THREAD_MAX_COUNT = 3
 filler_log = ''
 filler_log_lock = Lock()
 
@@ -331,7 +332,7 @@ def update_user_info():
             'msg': '参数错误。'
         }), 400)
 
-    if pw:
+    if new_user_info.get('pw'):
         new_user_info['is_pw_wrong'] = False
 
     count = user_col.update_one({
@@ -490,16 +491,18 @@ def run_auto_filler(wanna_fill_users):
         global filler_log
         filler_thread_list = []
         shuffle(wanna_fill_users)
-        thread_count = len(wanna_fill_users) // THREAD_USER_COUNT + 1
+
+        thread_user_count = max(THREAD_USER_MIN_COUNT, len(wanna_fill_users) // THREAD_MAX_COUNT)
+        thread_count = max(1, len(wanna_fill_users) // thread_user_count)
 
         for i in range(thread_count):
-            left_ = i * THREAD_USER_COUNT
-            right_ = (i + 1) * THREAD_USER_COUNT
-            right_ = len(wanna_fill_users) if right_ > len(wanna_fill_users) else right_
+            left_ = i * thread_user_count
+            right_ = min(len(wanna_fill_users), (i + 1) * thread_user_count)
+
             t = Thread(target=auto_filler_thread,
                        args=(wanna_fill_users[left_:right_], f'thread-{i + 1}'))
-            t.start()
             filler_thread_list.append(t)
+            t.start()
 
         for t in filler_thread_list:
             t.join()
