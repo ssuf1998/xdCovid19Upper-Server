@@ -42,7 +42,7 @@ sys_col = data_db['sys']
 
 captcha_dict = {}
 
-THREAD_USER_MIN_COUNT = 1
+THREAD_USER_MIN_COUNT = 10
 THREAD_MAX_COUNT = 3
 filler_log = ''
 filler_log_lock = Lock()
@@ -177,14 +177,16 @@ def signup():
             'is_pw_wrong': False,
             'is_up': {
                 'morning': const_.UP_STATUS.UNKNOWN
-                if now_hour > 12 or (now_hour == 11 and now_minute > 5)
+                if now_hour > 12 or (now_hour == 11 and now_minute > 45)
                 else const_.UP_STATUS.NOT_UP,
 
                 'afternoon': const_.UP_STATUS.UNKNOWN
-                if now_hour > 18 or (now_hour == 17 and now_minute > 5)
+                if now_hour > 18 or (now_hour == 17 and now_minute > 45)
                 else const_.UP_STATUS.NOT_UP,
 
-                'evening': const_.UP_STATUS.NOT_UP
+                'evening': const_.UP_STATUS.UNKNOWN
+                if now_hour > 22 or (now_hour == 21 and now_minute > 45)
+                else const_.UP_STATUS.NOT_UP
             }
         }
 
@@ -493,7 +495,9 @@ def run_auto_filler(wanna_fill_users):
         shuffle(wanna_fill_users)
 
         thread_user_count = max(THREAD_USER_MIN_COUNT, len(wanna_fill_users) // THREAD_MAX_COUNT)
-        thread_count = max(1, len(wanna_fill_users) // thread_user_count)
+        thread_count = (len(wanna_fill_users) // thread_user_count +
+                        0 if len(wanna_fill_users) % thread_user_count == 0 else 1
+                        )
 
         for i in range(thread_count):
             left_ = i * thread_user_count
