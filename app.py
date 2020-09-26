@@ -544,7 +544,8 @@ def timing_auto_filler():
         else:
             fill_users = user_col.find({
                 f'is_up.{util.time_2_name()}': const_.UP_STATUS.NOT_UP,
-                'is_pw_wrong': False
+                'is_pw_wrong': False,
+                'is_pause': False,
             }, {
                 '_id': False
             })
