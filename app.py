@@ -496,7 +496,7 @@ def run_auto_filler(wanna_fill_users):
 
         thread_user_count = max(THREAD_USER_MIN_COUNT, len(wanna_fill_users) // THREAD_MAX_COUNT)
         thread_count = (len(wanna_fill_users) // thread_user_count +
-                        0 if len(wanna_fill_users) % thread_user_count == 0 else 1
+                        (0 if len(wanna_fill_users) % thread_user_count == 0 else 1)
                         )
 
         for i in range(thread_count):
