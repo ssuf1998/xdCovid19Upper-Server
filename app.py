@@ -10,10 +10,11 @@ import json
 import logging
 from atexit import register as atexit_reg
 from copy import deepcopy
+from math import ceil
 from os import mkdir
 from os.path import exists
-from threading import Thread, Lock
 from random import shuffle
+from threading import Thread, Lock
 from time import localtime, time
 
 import pymongo
@@ -46,6 +47,8 @@ THREAD_USER_MIN_COUNT = 10
 THREAD_MAX_COUNT = 3
 filler_log = ''
 filler_log_lock = Lock()
+
+users_queue_dict = {}
 
 
 # 用于检查服务器是否正常运行，数据库还好着不
@@ -264,9 +267,12 @@ def get_user_info():
     })
 
     if specific_user:
+        specific_user = util.bson_to_obj(specific_user)
+        in_queue = users_queue_dict.get(sid, [0, -1])
+        specific_user['in_queue'] = in_queue[1]
         return make_response(jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
-            'user_info': util.bson_to_obj(specific_user),
+            'user_info': specific_user,
         }))
     else:
         return make_response(jsonify({
@@ -454,6 +460,10 @@ def check_captcha():
 def one_user_fill_finished(**kwargs):
     user = kwargs.get('recall').get('user')
     if user:
+        for sid in users_queue_dict.keys():
+            if users_queue_dict[sid][0] == users_queue_dict[user['sid']][0]:
+                users_queue_dict[sid][1] = max(-1, users_queue_dict[sid][1] - 1)
+
         user_col.update_one({
             'sid': user['sid']
         }, {
@@ -494,22 +504,27 @@ def run_auto_filler(wanna_fill_users):
         filler_thread_list = []
         shuffle(wanna_fill_users)
 
-        thread_user_count = max(THREAD_USER_MIN_COUNT, len(wanna_fill_users) // THREAD_MAX_COUNT)
-        thread_count = (len(wanna_fill_users) // thread_user_count +
-                        (0 if len(wanna_fill_users) % thread_user_count == 0 else 1)
-                        )
+        thread_user_count = max(THREAD_USER_MIN_COUNT, ceil(len(wanna_fill_users) / THREAD_MAX_COUNT))
+        thread_count = ceil(len(wanna_fill_users) / thread_user_count)
 
         for i in range(thread_count):
             left_ = i * thread_user_count
             right_ = min(len(wanna_fill_users), (i + 1) * thread_user_count)
 
+            single_thread_users = wanna_fill_users[left_:right_]
+
+            for j in range(len(single_thread_users)):
+                users_queue_dict[single_thread_users[j]['sid']] = [i, j]
+
             t = Thread(target=auto_filler_thread,
-                       args=(wanna_fill_users[left_:right_], f'thread-{i + 1}'))
+                       args=(single_thread_users, f'thread-{i + 1}'))
             filler_thread_list.append(t)
             t.start()
 
         for t in filler_thread_list:
             t.join()
+
+        users_queue_dict.clear()
 
         with open('./log/auto_filler.log', mode='a', encoding='utf-8') as fp:
             fp.write(filler_log)
@@ -614,8 +629,10 @@ if not exists('./log'):
 
 if __name__ == '__main__':
     # init_scheduler_once()
-    # app.run(host='0.0.0.0', port=5015)
-    timing_auto_filler()
+    # t = Thread(target=timing_auto_filler)
+    # t.start()
+    app.run(host='0.0.0.0', port=5015)
+    # timing_auto_filler()
 else:
     init_scheduler_once()
     gunicorn_logger = logging.getLogger('gunicorn.error')
