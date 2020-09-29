@@ -519,6 +519,8 @@ def run_auto_filler(wanna_fill_users):
             t = Thread(target=auto_filler_thread,
                        args=(single_thread_users, f'thread-{i + 1}'))
             filler_thread_list.append(t)
+
+        for t in filler_thread_list:
             t.start()
 
         for t in filler_thread_list:
