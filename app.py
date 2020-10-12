@@ -49,6 +49,7 @@ filler_log = ''
 filler_log_lock = Lock()
 
 users_queue_dict = {}
+queue_lock = Lock()
 
 
 # 用于检查服务器是否正常运行，数据库还好着不
@@ -460,9 +461,11 @@ def check_captcha():
 def one_user_fill_finished(**kwargs):
     user = kwargs.get('recall').get('user')
     if user:
+        queue_lock.acquire()
         for sid in users_queue_dict.keys():
             if users_queue_dict[sid][0] == users_queue_dict[user['sid']][0]:
                 users_queue_dict[sid][1] = max(-1, users_queue_dict[sid][1] - 1)
+        queue_lock.release()
 
         user_col.update_one({
             'sid': user['sid']
