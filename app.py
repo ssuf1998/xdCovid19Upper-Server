@@ -244,6 +244,7 @@ def login():
 # 获取用户信息，包括填报状态啊等
 @app.route('/getuserinfo', methods=['POST'])
 def get_user_info():
+    global users_queue_dict
     form_data = flask_req.form if len(flask_req.form) != 0 else json.loads(flask_req.data)
 
     if not util.check_params(
@@ -459,13 +460,17 @@ def check_captcha():
 
 # 当filler在填完一个用户后，会回调这个函数
 def one_user_fill_finished(**kwargs):
+    global users_queue_dict
     user = kwargs.get('recall').get('user')
     if user:
-        queue_lock.acquire()
-        for sid in users_queue_dict.keys():
-            if users_queue_dict[sid][0] == users_queue_dict[user['sid']][0]:
-                users_queue_dict[sid][1] = max(-1, users_queue_dict[sid][1] - 1)
-        queue_lock.release()
+        try:
+            queue_lock.acquire()
+            for sid in users_queue_dict.keys():
+                if users_queue_dict[sid][0] == users_queue_dict[user['sid']][0]:
+                    users_queue_dict[sid][1] = max(-1, users_queue_dict[sid][1] - 1)
+            queue_lock.release()
+        except Exception as e:
+            app.logger.error(e)
 
         user_col.update_one({
             'sid': user['sid']
@@ -479,7 +484,6 @@ def one_user_fill_finished(**kwargs):
 
 def auto_filler_thread(users, name_):
     global filler_log
-
     retry_times = 0
     filler = XCUAutoFiller(thread_name=name_)
     filler.on('one_finished', one_user_fill_finished)
@@ -504,6 +508,7 @@ def auto_filler_thread(users, name_):
 def run_auto_filler(wanna_fill_users):
     try:
         global filler_log
+        global users_queue_dict
         filler_thread_list = []
         shuffle(wanna_fill_users)
 

@@ -141,7 +141,7 @@ ignore/
 chromedriver.exe
 chromedriver
 scheduler.lock
-xcu_gunicorn_conf
+xcu_gunicorn_conf.py
 log/
 test_filler.py
 invitation_code_generator.py
