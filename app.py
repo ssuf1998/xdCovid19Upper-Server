@@ -26,6 +26,7 @@ from pymongo.errors import ServerSelectionTimeoutError
 
 import const_
 import util
+from RWLock import RWLock
 from XCUAutoFiller import XCUAutoFiller
 
 app = Flask(__name__)
@@ -49,7 +50,7 @@ filler_log = ''
 filler_log_lock = Lock()
 
 users_queue_dict = {}
-queue_lock = Lock()
+queue_lock = RWLock()
 
 
 # 用于检查服务器是否正常运行，数据库还好着不
@@ -270,7 +271,8 @@ def get_user_info():
 
     if specific_user:
         specific_user = util.bson_to_obj(specific_user)
-        in_queue = users_queue_dict.get(sid, [0, -1])
+        with queue_lock.r_locked():
+            in_queue = users_queue_dict.get(sid, [0, -1])
         specific_user['in_queue'] = in_queue[1]
         return make_response(jsonify({
             'code': const_.DEFAULT_CODE.SUCCESS,
@@ -461,16 +463,13 @@ def check_captcha():
 # 当filler在填完一个用户后，会回调这个函数
 def one_user_fill_finished(**kwargs):
     global users_queue_dict
+
     user = kwargs.get('recall').get('user')
     if user:
-        try:
-            queue_lock.acquire()
+        with queue_lock.w_locked():
             for sid in users_queue_dict.keys():
                 if users_queue_dict[sid][0] == users_queue_dict[user['sid']][0]:
                     users_queue_dict[sid][1] = max(-1, users_queue_dict[sid][1] - 1)
-            queue_lock.release()
-        except Exception as e:
-            app.logger.error(e)
 
         user_col.update_one({
             'sid': user['sid']
@@ -484,6 +483,7 @@ def one_user_fill_finished(**kwargs):
 
 def auto_filler_thread(users, name_):
     global filler_log
+
     retry_times = 0
     filler = XCUAutoFiller(thread_name=name_)
     filler.on('one_finished', one_user_fill_finished)
@@ -499,9 +499,8 @@ def auto_filler_thread(users, name_):
         else:
             break
 
-    filler_log_lock.acquire()
-    filler_log += filler.log
-    filler_log_lock.release()
+    with filler_log_lock:
+        filler_log += filler.log
 
 
 # 自动填报核心！
@@ -509,6 +508,7 @@ def run_auto_filler(wanna_fill_users):
     try:
         global filler_log
         global users_queue_dict
+
         filler_thread_list = []
         shuffle(wanna_fill_users)
 
